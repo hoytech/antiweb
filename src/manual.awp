@@ -1,0 +1,920 @@
+;; Antiweb (C) Doug Hoyte
+
+(defglue sections (&rest sects)
+  (with-output-to-string (s)
+    (format s #"<ol>"#)
+    (dolist (sect sects)
+      (format s "<li><a href=\"#~a\">~a</a>" (car sect) (cadr sect)))
+    (format s #"</ol><hr>"#)
+    (dolist (sect sects)
+      (format s #"<fieldset><legend id="~a">~a</legend>~a</fieldset>"# (car sect) (cadr sect)
+                (awp-super-glue (cons 'p (cddr sect)))))))
+
+(defglue tip (text)
+  (format nil #"<span class=tip><b><u>Antiweb Tip</u></b><br>~a</span>"# (awp-super-glue text)))
+
+
+(defglue awp-guiding-principles ()
+  (awp-super-glue
+    '(fieldset "The Guiding Principles for Anti Webpages" (ul
+       #"Anti Webpages: When you just gotta git 'er done dammit."#
+       #"If you want to write straight HTML or Javascript or CSS, go ahead and do it. Anti Webpages don't judge, they glue."#
+       #"If you can't solve it with a regular expression, you aren't trying hard enough."#
+       #"There's Even More Ways To Do It Than In Perl (TEMWTDITIP)."#
+       #"It doesn't matter how deep you go. There's <b>no bottom</b>."#
+       #"Why duct-tape when you can super-glue?"#
+      ))))
+
+
+(page "index.html"
+  :title "Antiweb Manual"
+  :header #"<h1><u>Antiweb Manual</u></h1>"#
+  :slogan #"<i>For admins, by admins.</i>"#
+
+  :layout #"
+logo@r |  |          header@l        |   slogan  |
+nav@rt |  |          content@tl                  |
+                       footer                    |
+"#
+
+  :layout-width 800
+
+  :css #"
+body {
+  font-family: Verdana, Arial, sans-serif;
+}
+
+h1 {
+  font-size:40px;
+}
+
+a:link,a:visited {
+  color:#00F;
+}
+
+hr {
+  margin-top: 3%;
+  margin-bottom: 2%;
+  border:0px;
+  color: black;
+  background-color: black;
+  height: 3px;
+  width: 5%;
+}
+
+fieldset {
+  border:1px solid #000;
+  padding:1em 1em 1em 1.5em;
+}
+
+legend {
+  font-size:18px;
+}
+
+pre {
+  background: #eeeeee;
+  border: 1px solid #888888;
+  color: black;
+  padding: 1em;
+  white-space: pre;
+}
+
+span.tip {
+  background: #57ffed;
+  border: 1px solid #888888;
+  width: 40%;
+  float: right;
+  padding: 1em;
+  margin: 1em 0 1em 1em;
+}
+"#
+
+  :logo #"<img src="http://hoytech.com/antiweb/antiweb.png">"#
+  :content (p
+#"This is the official manual for the #(link "http://hoytech.com/antiweb/" "Antiweb") webserver. We take documentation seriously. If you have questions that aren't answered in the docs, that is a bug. Please #(link "http://groups.google.com/group/antiweb" "report it to us") so we can answer your question and improve the manual."#
+#"Which section of the manual you should read depends on your interest in Antiweb:"#
+
+(ul
+  #"#(link "design.html" "Design of Antiweb4") is a high-level description of what Antiweb is and why you should use it."#
+  #"Once you have decided to install Antiweb, follow the instructions in the #(link "install.html" "Installation") section. If you run into problems during or after installation, check the #(link "faq.html" "FAQ")."#
+  #"The #(link "worker.html" "Worker Conf File Reference") describes all the options and features available to worker processes."#
+  #"Antiweb's experimental HTML+CSS+JS creation programs are called #(link "awp.html" "Anti Webpages"). The manual you are reading now is an Anti Webpage."#
+))
+
+  :nav
+    (p (link "index.html" "Start")
+       (link "design.html" "Design of Antiweb4")
+       (link "install.html" "Installation")
+       (link "faq.html" "FAQ")
+       (link "worker.html" "Worker Conf File Reference")
+       (link "awp.html" "Anti Webpages"))
+
+  :footer "All content is &copy; Hoytech unless otherwise noted or implied."
+
+)
+
+
+(page "design.html"
+  :title "Antiweb Manual: Design of Antiweb4"
+  :header #"<h1><u>Design of Antiweb4</u></h1>"#
+  :inherit "index.html"
+
+  :content
+  (sections
+    (future #"Next-Generation of Antiweb"#
+      #"Antiweb is a webserver written in Common Lisp, C, and Perl by #(link "http://hoytech.com" "Hoytech"). Antiweb is not a "proof of concept" and is not "exploratory code". We intend the core design of Antiweb (as described in this design paper) to be stable for the next 10+ years of use."#
+      #"The two webservers that have had the largest influence on Antiweb4 are #(link "http://nginx.net" "nginx") and #(link "http://www.lighttpd.net/" "lighttpd"). #(tip #"Did you know that Antiweb is older than both lighttpd and nginx? It used to be called #(link "http://hcsw.org/awhttpd/" "awhttpd")."#) We took liberal advantage investigating these and other excellent servers while designing Antiweb4. Another more obscure server that has influenced Antiweb is #(link "http://fhttpd.org" "fhttpd")."#
+      #"Why another webserver? In our opinion, the biggest problem with the above servers is that they aren't written in lisp. Many servers that we studied have grafted on extension languages (ie, Perl for nginx and Lua for lighttpd). Antiweb is different. Instead of being a C program that uses some other language, Antiweb is a lisp program that uses C (and Perl)."#
+    )
+    (server-design "Server Design"
+
+      #"Like nginx, lighttpd, fhttpd, and Antiweb3, Antiweb4 is an <b>asynchronous</b> or <b>event-based</b> or <b>non-blocking</b> server, meaning that a single thread of control multiplexes multiple client connections. An Antiweb system is a collection of unix processes. Connections are transferred between processes with #(link "http://www.openbsd.org/cgi-bin/man.cgi?query=sendmsg" "sendmsg()"). When this happens, any data that was initially read from the socket is transferred along with the socket itself. The socket is always closed in the sending process."#
+      #"To multiplex connections inside a process, Antiweb uses a state machine data structure defined in <b>src/libantiweb.h</b>. Antiweb requires either the kqueue() or epoll() stateful event APIs in level-triggered mode."#
+   (ul #"On a 32 bit linux/CMUCL system, 10000 inactive keepalive connections consume about 3M of user-space memory (in addition to two lisp images)."# #"The number of inactive keepalive connections has negligible performance impact on new connections."#)
+      #"There are three modes for sending files: medium, small, and large:"#
+      (ol
+        #"<b>Medium:</b> These files are mmap()ed (memory mapped) to avoid copying the file's data into user-space. The data is copied directly from the filesystem to the kernel's socket buffer."#
+        #"<b>Small:</b> These files are read into a user-space buffer because a small read() is often cheaper than mmap()+munmap()."#
+        #"<b>Large:</b> Antiweb uses a user-space buffer for large files. This is to avoid disk-thrashing when serving many large files to clients concurrently (#(link "http://blog.lighttpd.net/articles/2005/11/11/optimizing-lighty-for-high-concurrent-large-file-downloads" "idea from lighttpd")) and to avoid running out of address space on 32 bit systems."#
+      )
+      #"<b>Super-size it:</b> Because Antiweb uses a 64 bit off_t type and lisp's unlimited precision integers on all systems, Antiweb can serve files of any size. It also supports #(link "worker.html#DOWNLOAD-RESUMING" "download resuming") for all three file send modes."#
+      #"Antiweb's data structures are designed for <b>pipelining</b>. Antiweb uses <b>vectored I/O</b> (also known as scatter-gather I/O) nearly everywhere. Antiweb's internal message passing protocol uses pipelining also. For example, an HTTP connection that pipelines two requests for small files followed by one request for a medium file is responded to with a single writev() system call consisting of the following:"#
+      (ul
+        #"The HTTP headers and file contents for the first two small files"#
+        #"The HTTP headers for the medium file"#
+        #"As much of the memory mapped medium file as it takes to fill the kernel's socket buffer."#
+      )
+      #"Subsequently, all the generated log messages are written to the hub process with another writev(). The hub will eventually append the log messages (as well as any others that queue up) onto the <b>axslog</b> log file."#
+      #"To see the connection statistics of a worker process, use the #(link "faq.html#STATS" "-stats") command:"#
+(pre #"# antiweb -stats /var/aw/example.conf
+...
+Keepalive Time: 65 seconds
+Total Connections: 41  HTTP requests: 72  Avg reqs/conn: 1.8
+File descriptor usage (estimate): 17/32767
+Current Connections: 11
+  Keepalives: 7  Sending files to: 2
+  Proxy: Sources: 0  Sinks: 0  Idle: 0
+  Timers: 0  Hub: 1  Unix Connections: 1
+  Lingering: 0  Zombies: 0
+...
+"#)
+      #"Notice that in addition to the HTTP traffic, there is also a connection to the hub's unix socket that was opened on start-up, and one other open unix socket. That other unix socket is you. You created a supervisor connection while asking for stats info."#
+      #"-stats will also tell you how hosts are mapped to directories on a worker:"#
+(pre #"# antiweb -stats /var/aw/example.conf
+...
+Host -> HTML root mappings:
+  localhost -> /var/www/testing
+  example.com -> /var/www/example.com
+  www.example.com -> /var/www/example.com
+...
+"#)
+    #"Although usually we love it, sometimes pipelining is bad. Antiweb deliberately tears down persistent HTTP connections on certain responses:"#
+    (ul #"<b>4XX and 5XX HTTP Errors</b> - This is to prevent blind web vulnerability scanners like #(link "http://www.cirt.net/nikto2" "nikto") from persisting or pipelining 95+ percent of their requests."#
+        #"<b>Directory Listings</b> - To prevent pipelined recursive crawling."#
+    )
+    #"When finished with a connection, Antiweb will shutdown the write direction of the socket and #(link "faq.html#LINGER" "linger") as required by HTTP/1.1. Antiweb always gracefully degrades for HTTP/0.9 and HTTP/1.0 clients. Antiweb has first-class IPv6 support. If you really do want to pipeline 4XX and 5XX errors, you have two options:"#
+    (ol
+      #"Use Antiweb's #(link "worker.html#REWRITE" "rewrite module") to change problematic requests into requests for existing files."#
+      #"Use Antiweb's #(link "worker.html#FAST-FILES" "fast-files module"). This is a memory cache that supports accelerated static content, pre-generation of HTTP headers, negative caching, and persisting/pipelining 404 errors."#
+    )
+    #"Antiweb was designed with security in mind from the beginning. Here are some of the security decisions made during the Antiweb design process:"#
+    (ul
+      #"Virtual hosts are privilege-separated <b>without proxying</b>. Once the hub has determined which worker should handle a connection, it transfers the socket to the worker process and has nothing further to do with the connection. Worker processes run under different UIDs from the hub (and each-other). Workers are optionally #(link "worker.html#CHROOT" "chroot()ed")."#
+      #"Workers have no access to log files: all log messages are sent to the hub over the unix socket. This means that a compromised worker process cannot steal previously created log messages or log messages created by other workers."#
+      #"#(link "design.html#CGI-PROCESSES" "CGI processes") can be restricted with resource limitations."#
+      #"Even on lisps without unicode support, Antiweb4 guarantees all internal data and filenames are #(link "design.html#UNICODE" "UTF-8") encoded. This includes verifying all code-points are in their shortest possible representation and that there are no otherwise invalid surrogates."#
+      #"Antiweb processes never try to clean-up or recover in the event of an unexpected condition. A process cannot do that because it has #(link "faq.html#ERLANG" "failed"). Some other process that hasn't failed will clean-up after it."#
+    )
+    #"Antiweb also includes an experimental new technology for constructing webpages called #(link "awp.html" "Anti Webpages"). These are Perl-inspired programs that let you draw page layouts with significant whitespace, glue together HTML/CSS/Javascript, and more."#
+    #"<b>Antiweb was created for admins, by admins</b>. Please #(link "http://groups.google.com/group/antiweb" "let us know") any ways you think it could be better."#
+)
+    (memory-management "Memory Management"
+      #"The most important memory management system in Antiweb is lisp's garbage-collector. Many implementations of Common Lisp that Antiweb supports have excellent generational collectors so you will probably never notice pausing except in stressful benchmarks."#
+      #"Outside of lisp, Antiweb also maintains two important data structures: <b>conns</b> and <b>ioblocks</b>. The definitions of these data structures are in the file <b>src/libantiweb.h</b>. Despite the extension, this is not a C header file. It is a special format that can be parsed by both lisp and a C compiler."#
+      #"You can always get a break-down of the memory being used by an Antiweb process with the <b>-room</b> command. Here is what it might look like when you query a worker using CMUCL:"#
+      (pre #"
+# antiweb -room /var/aw/example.conf
+Reloaded library "libantiweb32.so"
+
+"---ANTIWEB MEMORY STATS---
+Dynamic Space Usage:        1,946,272 bytes (out of  512 MB).
+Read-Only Space Usage:     24,024,304 bytes (out of  256 MB).
+Static Space Usage:         3,665,792 bytes (out of  256 MB).
+Control Stack Usage:            1,636 bytes (out of  128 MB).
+Binding Stack Usage:               88 bytes (out of  128 MB).
+The current dynamic space is 0.
+Garbage collection is currently enabled.
+
+conns and ioblocks:
+  Allocated conns:     2, 470 bytes
+  Allocated ioblocks:  1, 4112 bytes, 14 in use, 99.7% overhead
+  Free conns:          2, 470 bytes
+  Free ioblocks:       514, 2113568 bytes
+  Total:               2118620 bytes + malloc overhead
+---END OF ANTIWEB MEMORY STATS---"
+"#)
+      #"If you look through the file <b>src/libantiweb.c</b>, you will see that Antiweb malloc()s conn and ioblock structures but never free()s them. When Antiweb is done with a structure it pushes it onto a free-list. The next time it needs a structure it pops the most recently pushed one off the free-list. Antiweb can do this because conn and ioblock structures are always the same size."#
+      #"<b>Freeing memory considered harmful.</b>"#
+      #"In the above <b>-room</b> output, the conn and ioblock measurements represent the <b>high water mark</b>. During periods of heavy traffic, more memory is allocated. When the traffic settles down, the pages at the bottom of the free-lists are swapped out by the kernel as needed."#
+)
+    (processes "Processes"
+      #"For performance and security, Antiweb is a group of unix processes. This section describes the roles and responsibilities of the different processes."#
+
+      #"Every valid HTTP connection touches at least two processes: the hub process and the worker that has been assigned to the virtual host requested. The following figure illustrates a running Antiweb system. The arrows represent #(link "http://www.openbsd.org/cgi-bin/man.cgi?query=unix" "unix") socket connections (AF_UNIX) between processes or a listening internet socket."#
+      (fieldset #"Antiweb4 Processes"# #"<img src="http://hoytech.com/antiweb/processes.png">"#)
+      (sections
+        (supervisor-process "Supervisor Process"
+          (ul
+            #"Supervisor processes are only intended for interactive use, not as unattended, long running processes."#
+            #"A supervisor process never executes the eval message."#
+          )
+          #"Supervisor processes do not run during normal Antiweb operation. The user must (as root) manually start a supervisor process. #(tip "Although you must start a supervisor process as root, root privileges are dropped once you have attached. They are dropped to the same UID/GID as the process you are attaching to.") Typically, you will only run a supervisor process to #(link "faq.html#ATTACH" "attach") to other processes for diagnostics/development/etc."#
+          #"Supervisor processes are created for almost every Antiweb operation, including #(link "faq.html#STATS" "-stats") queries and #(link "faq.html#ADDING-LISTENERS" "adding or removing listeners"). When you attach to a worker process, the hub passes the supervisor process's unix socket to the worker over the same unix socket that HTTP connections are transferred over."#
+        )
+        (hub-process "Hub Process"
+          #"The hub process is usually the busiest process in the Antiweb system. Here are its duties:"#
+          (ul
+            #"Accept new connections over its unix socket, which may either be connecting worker processes or supervisor connections."#
+            #"Accept HTTP connections from the internet, decide based on the requested virtual host (vhost) which worker the connection applies to, then send the already read data from the connection along with the socket itself over the unix socket to the worker. This process closes the socket in the hub process so it is only open in the worker."#
+            #"Accept all log messages from worker processes and append them to the log files."#
+            #"Route inter-process messages (such as supervisor connections)."#
+          )
+          #"Some other details about the hub:"#
+          (ul
+            #"Runs as its own UID specified in the hub conf file. The GID is always the same as the UID."#
+            #"chroot()ed to the log directory, of which it owns and has write permissions."#
+            #"It will chmod() the log files so they are never world readable/writeable."#
+            #"Log files cannot be symlinks."#
+          )
+        )
+        (worker-process "Worker Process(es)"
+          #"The worker processes do the heavy lifting of processing HTTP requests."#
+          (ul
+            #"Each runs under its own UID specified in the #(link "worker.html#UID" "worker conf"). The GID is always the same as the UID."#
+            #"Optionally #(link "worker.html#CHROOT" "chroot()ed")."#
+            #"Because it is transferred connecting client sockets, the worker process handles all subsequent HTTP requests on these sockets. They do not go through the hub."#
+          )
+          #"#(tip #"Why would you want to run multiple workers?<br>#(ul "Privilege separated vhosts" "SMP/multi-core" "Reduce disk latency")"#) On start-up, each worker process reads its conf file and compiles a function for dispatching HTTP requests given the mount points and other features present. After it starts, a worker process will never re-open this conf file. The only way to provide it a new conf file is by message passing using a supervisor process. This is necessary to allow you to chroot() a worker to a root not containing the conf file."#
+          #"After registering the vhosts it is interested in with the hub, a worker process will "lock" the hub connection so it can't register additional vhosts. To later add vhosts, the connection must be manually unlocked by a supervisor process (this happens behind-the-scenes when you #(link "faq.html#RELOADING-WORKER-CONF" "-reload") a worker conf--see one possible but #(link "faq.html#RELOAD-ATTACK" "unlikely attack") related to this.). If you try to -reload with a bad worker conf, Antiweb will not install the new conf and will continue with the original conf. If you -reload a worker conf and it compiles fine but throws some error during processing an HTTP request, Antiweb will #(link "faq.html#ROLLBACKS" "rollback") to the previous conf."#
+          (fieldset "Privilege Separation" (ul #"A compromised worker process cannot steal connections for vhosts that don't belong to it."# #"A compromised worker process cannot intercept log messages created by other workers."#))
+        )
+        (cgi-process "CGI Process(es)"
+          #"#(tip "The limit on the length of POST content is defined in src/libantiweb.h as AW_MAX_POST_LEN")Antiweb is conditionally compliant with CGI/1.1. All useful environment variables are supported, as well as buffered POST content on standard input. PATH_INFO is supported and is implemented more efficiently than many other servers (including Antiweb3). Your CGI script may start receiving data before the entire POST content has been read by the worker. If the POST is terminated prematurely, the content may be cut short. Be sure to check you have read exactly $ENV{CONTENT_LENGTH} bytes."#
+          (ul #"CGI processes run under the same UIDs as the worker processes that spawn them. If you chroot your worker processes, expect using CGI to be more difficult."#
+              #"CGI scripts have all file descriptors from their parent worker closed as well as the worker's epoll descriptor (kqueues don't transfer on fork())."#
+              #"Requests to CGI scripts always close the HTTP connection. You don't need to send a "Connection: close", Antiweb will send that for you (unless you use #(link "worker.html#NAKED-CGI" "naked CGI scripts"))."#
+              #"CGI scripts are unable to issue Antiweb log messages or even indicate success/failure to Antiweb (it just ignores CGI process exit() codes). Zombies are reaped."#))))
+    (confs-and-xconfs "Confs and Xconfs"
+      #"Antiweb is not written in Common Lisp for the sake of novelty. Common Lisp was selected because <b>it is the best</b>. Instead of writing our own config file parsers, string routines, memory allocators, condition systems, dynamic binding systems, just-in-time compilers, etc, etc., we rely heavily on many features of Common Lisp (but not its I/O or pathnames)."#
+      #"If you haven't used lisp before, Antiweb may require a major shift in thinking. Many things you may think are impossible are easy. Languages like C are designed to be easy to implement&mdash;Common Lisp is designed to be powerful to program. #(tip #"The primary description of our lisp programming style is Doug Hoyte's book:<br>#(link "http://letoverlambda.com" "Let Over Lambda")."#) Even if you have programmed in lisp before, "The Antiweb Way" might still seem foreign. Just like Antiweb is not a conventional webserver, it is also not a conventional lisp program."#
+      #"This section describes the most important data-structures for installing, configuring, extending, and creating content for Antiweb: confs and xconfs."#
+      (sections
+        (confs #"confs"#
+          #"As an administrator, almost all Antiweb files you interact with are called <b>conf</b> files."#
+          #"Conf files are text files filled with lisp forms. Every one of these lisp forms must be a list with the first element a symbol identifying the type of the form. This might be an example conf:"#
+(pre #"(worker blah)
+(uid 1234)"#)
+          #"If a worker contains an inherit element, the corresponding file will also be parsed as a conf and its contents are appended to the current file's conf:"#
+          (pre #"(inherit "/absolute/path/to/inherited.conf")"#)
+          (ul "Circular inherits are detected and signal errors.")
+        )
+        (xconfs #"xconfs"#
+          #"The forms inside confs are called <b>xconfs</b>. They must begin with an identifying symbol, and then are optionally followed by arguments. The xconfs in the example confs from the previous section each had one mandatory argument, like this:"# (pre #"(name "value")"#) #"But here is an xconf with no mandatory arguments and one optional argument:"#
+(pre #"(name :arg "value")"#)
+          #"Xconfs superficially resemble Common Lisp #(link "http://www.lispworks.com/documentation/HyperSpec/Body/m_destru.htm" "destructuring") but are in fact <b>very different</b>. For instance, the same argument can be given multiple values in a single xconf:"#
+(pre #"(name :arg "value1" :arg "value2")"#)
+          #"Depending on the type of xconf, Antiweb may use only "value1" or it may use both "value1" and "value2"."# #"Xconfs can also have boolean arguments:"#
+(pre #"(name :arg "value1" :boolean-arg)
+(name :boolean-arg :arg "value1")"#)
+          #"The presence of the :boolean-arg keyword in the above examples <b>turns on</b> some functionality. In this respect, xconfs are closer to unix shell arguments than Common Lisp destructuring."#
+        )
+      )
+      "Confs and xconfs are designed to be intuitive and extremely flexible. The src/conf.lisp file has more details on how and why confs and xconfs work."
+    )
+    (filesystem "Filesystem Layout"
+      #"Antiweb's #(link "install.html" "installation procedure") adds three (3) files to your filesystem. Their paths can be changed by editing build.lisp before compiling Antiweb. By default they are:"#
+      (ul
+#"<b>/usr/bin/antiweb</b> - The perl launch script. All Antiweb processes are launched through this script interface."#
+#"<b>/usr/lib/libantiweb32.so</b> or <b>/usr/lib/libantiweb64.so</b> - The Antiweb shared library. Most of the code for accessing the network and filesystem is compiled and stored here. The name depends on your architecture."#
+#"<b>/usr/lib/antiweb.cmu.image</b> or <b>/usr/lib/antiweb.clisp.image</b> or <b>/usr/lib/antiweb.ccl.image</b> - A frozen image of the memory of an Antiweb lisp process. The name depends on your lisp environment."#
+      )
+      #"You also need to create a hub directory. Inside this directory (typically <b>/var/aw/</b>):"#
+      (ul #"<b>hub.conf</b> - Hub configuration. Includes which interaces/ports to listen for connections on (though you can #(link "faq.html#ADDING-LISTENERS" "add more later without restarting")), the UID the hub should run as, and the file descriptor limit for the hub process."#
+          #"<b>hub.socket</b> - Unix domain socket for connecting to the hub. It is owned by root and no other user can connect. All Antiweb administration, development, and inter-process communication is done through this socket."#
+          #"<b>aw_log/</b> - The log directory. The hub process is chroot()ed to this directory. This directory name starts with the "aw_" prefix because that is a special prefix and such directories will never be served by Antiweb through HTTP in case of an incorrectly configured HTML root. This convention dates back to Antiweb2. In any case, both of Antiweb's log files are owned and only readable by the hub user. The two log files are: #(ul #"<b>syslog</b> - System log messages. Always check this file first if something isn't working."# #"<b>axslog</b> - Access logs. All valid HTTP requests are recorded here."#) Workers pass log messages to the hub through the unix socket. There are two ways to make the hub #(link "faq.html#REOPEN-LOG-FILES" "reopen its log files")."#
+       )
+      #"There is one <b>worker.conf</b> file per worker process. These files can live anywhere but a good place is in the <b>/var/aw/</b> hub directory. They should not be owned (or writeable) by any user that a worker or hub runs as."#
+      #"Every worker that uses #(link "worker.html#GZIP" "gzip content encoding"), #(link "awp.html" "Anti Webpages"), #(link "worker.html#JSMIN" "javascript minification") or #(link "worker.html#CSSMIN" "CSS minification") must have a #(link "faq.html#CACHE" "cache directory"). This directory must be owned by the user the worker runs as. No other users should have write access to this directory. Cache directories should never be in /tmp/ and should never have sticky bits."#
+)
+    (unicode "Unicode"
+#"#(tip #"Although all data is internally stored as (and enforced to be) UTF-8, you can map static files to different charsets with the #(link "worker.html#MIME-TYPE" ":mime-type") parameter of the worker conf. Also, in CGIs you can send any mime-type you want."#)
+      Antiweb4 supports exactly one type of character data:
+      #(ul #"<b>UTF-8</b> encoded unicode code points."#)
+      All filenames must be UTF-8. The HTML content in #(link "awp.html" "Anti Webpages") is always UTF-8. Here are some technologies <b>NOT</b> supported:
+      #(ul "ASCII" "Latin-1" "UTF-16" "etc...")
+      The plan is to store user data in #(link "http://www.unicode.org/reports/tr15/" "Normalization Form C") (but this is not implemented yet).
+"#
+    )
+    (awp "Anti Webpages"
+      #"We love #(link "http://www.perl.org" "Perl"). Anti Webpages are an attempt to bring the Perl spirit to the modern web and to make this style of programming extremely efficient. Anti Webpages are not idealist, they are pragmatic. The manual you are reading now is an Anti Webpage."#
+      (awp-guiding-principles)
+      #"See the #(link "awp.html" "Anti Webpages") section of the manual for more details."#
+    )
+  )
+)
+
+(page "install.html"
+  :title "Antiweb Manual: Installation"
+  :header #"<h1><u>Installing Antiweb</u></h1>"#
+  :inherit "index.html"
+
+  :content
+    (p #"The following steps outline the official Antiweb installation procedure. We recommend that you read the #(link "design.html" "Design of Antiweb4") page before you install Antiweb."#
+     (fieldset "Antiweb Installation Procedure"
+     (ol (p #"Install #(link "http://www.cons.org/cmucl/" "CMUCL") or #(link "http://clisp.cons.org/" "CLISP") or #(link "http://www.clozure.com/clozurecl.html" "ClozureCL") (or #(link "faq.html#MULTIPLE-LISPS" "some combination of the above")). Also ensure you have perl, gcc, zlib, and all necessary #(link "faq.html#GCC-ERRORS" "header files") installed."#)
+         (p #"#(link "http://hoytech.com/antiweb/beta/" "Download Antiweb"), extract it, and cd into the Antiweb directory:"#
+(pre #"$ tar zxf antiweb-X.tar.gz
+$ cd antiweb-X"#))
+         (p #"OPTIONAL: Modify the build options at the top of build.lisp. Alternatively, create a #(link "faq.html#LOCAL-CONFIG" "local.lisp") file."#)
+         (p #"Build Antiweb. This depends on your lisp environment. For CMUCL, use this command:"#
+            (pre #"$ lisp -quiet -load build.lisp"#)
+            #"For CLISP, use this command"#
+            (pre #"$ clisp -q build.lisp"#)
+            #"For ClozureCL, use this command"#
+            (pre #"$ ccl64 -Q -l build.lisp"#)
+            #"When finished, the build script should inform you it has saved your lisp image."#)
+         (p #"Antiweb will not rudely scatter files around your filesystem without telling you. cd into the bin directory and review the install.sh script:"#
+(pre #"$ cd bin
+$ cat install.sh"#))
+         (p #"Once satisfied, become root and run the install script (make sure you are in the bin directory):"#
+            (pre #"$ su
+Password:
+# ./install.sh"#)
+            #"For information on the files that are installed, see #(link "design.html#FILESYSTEM" "filesystem")."#
+            ;#"<i>If using CMUCL, you will now need to repeat the build and install process a second time (go back to step 4). This is because when your image is saved, the libantiweb32.so shared library must be available as a system library. For more details, see #(link "faq.html#CMUCL-LIMITATIONS" "this FAQ entry").</i>"#
+         )
+         (p #"Antiweb should now be installed. Next create a hub directory:"#
+            (pre #"# antiweb -skel-hub-dir 20000 /var/aw"#)
+            #"The first argument to -skel-hub-dir (20000 above) is the UID that you plan to run the hub as. OPTIONAL: If you have a user created, you can give the user name instead of a UID number."#
+            #"The hub directory you specified should have been created. OPTIONAL: You can now edit the created hub.conf file (ie <b>/var/aw/hub.conf</b>)."#
+         )
+         (p #"You now need to create one or more worker conf files. They can be stored anywhere, but a good place is along with the hub.conf file in the hub directory:"#
+            (pre #"# antiweb -skel-worker-basic > /var/aw/worker.conf"#)
+            #"#(tip "-skel-worker-basic is just one of the possible worker skeletons. To see a list of all of them, run <b>antiweb</b> with no arguments.") You will now need to edit the created worker conf (ie <b>/var/aw/worker.conf</b>). At a minimum, you must specify the hub directory created in the previous step, the UID this worker should run as, the virtual hosts this worker should handle, and the location of the HTML root for this worker. For complete details on the config file format, see the #(link "worker.html" "worker conf file reference")."#
+            #"<b>IMPORTANT:</b> No conf files should ever be owned or writeable by a UID that a hub or worker runs as. The conf files don't even need to be readable to them (but a worker's current conf file is stored in memory so making it unreadable only prevents <i>other</i> workers from reading it.)."#
+         )
+         (p #"Finally, launch the hub and worker processes:"#
+            (pre #"# antiweb -hub /var/aw
+# antiweb -worker /var/aw/worker.conf"#)
+            #"You may also want to ensure that these launch commands are run at start-up. They must be run by root."#
+            (ul #"If anything goes wrong, the first place to look is at the bottom of the syslog file (ie <b>/var/aw/aw_log/syslog</b>)."#)
+         )
+     ))
+  )
+)
+
+(page "faq.html"
+  :title "Antiweb Manual: FAQ"
+  :header #"<h1><u>Frequently Asked Questions</u></h1>"#
+  :inherit "index.html"
+
+  :content
+    (sections
+      (crazy #"Antiweb is very different from other webservers. Are you guys crazy?"#
+        #"No. Well, maybe a little, but we aren't letting that stop us from building the best webserver ever. Before Antiweb4, we recommended the following servers:"# (ul (link "http://nginx.net" "nginx") (link "http://www.lighttpd.net" "lighttpd") (link "http://hcsw.org/awhttpd/" "awhttpd"))
+        #"These servers are good, but they don't take advantage of lisp, the greatest programming language in the world."#
+      )
+      (why-antiweb #"Why is it called Antiweb?"#
+        #"When the first generation of Antiweb was written, almost everybody was using process or thread per connection webservers. Rather than just follow what everyone else was doing, we were going to do our own thing and be the anti-web. So in 1999 we released awhttpd 2.0, an asynchronous select-based server. A couple years later, we released awhttpd 3.0, another select-based server that served us well for years."#
+        #"Today with servers like nginx and lighttpd, asynchronous servers are commonplace. But if you look closely at Antiweb you will notice that it is still quite different from most other servers. We like where we are going and hope you will too. (Note that we have nothing to do with #(link "http://port70.net/webless/antiweb.html" "any") #(link "http://www.virtueelplatform.nl/page/4224/en" "other") anti-webs.)"#
+      )
+      (platforms #"What platforms does Antiweb run on?"#
+        #"Tested platforms:"#
+        (ul
+          #"CMUCL/Linux 2.6/x86"#
+          #"CLISP/OpenBSD 4.3/x86"#
+          #"CLISP/Linux 2.6/x86"#
+          #"CMUCL/FreeBSD 7.0/x86"#
+          #"ClozureCL/Linux 2.6/x86-64"#
+        )
+        #"#(link "http://www.fefe.de/nowindows/" "Please do not port Antiweb to proprietary unix or lisp environments")."#
+      )
+      (contact #"Where can I ask questions, report bugs, etc?"#
+        #"Please use the #(link "http://groups.google.com/group/antiweb" "Antiweb Google Group") for discussions about Antiweb. Acceptable topics include but are not limited to:"#
+        (ul #"Questions about installation/setup"# #"Bug reports"# #"Feature requests"#)
+        #"Security issues or other sensitive communications can be sent directly to #(link "http://hcsw.org/contact.php" "Doug Hoyte")."#
+      )
+      (license "What license does Antiweb use?"
+        #"Your rights to use and distribute Antiweb are protected under the terms and conditions of the #(link "http://www.gnu.org/licenses/gpl.html" "GNU GPL version 3")."#
+        (ul #"The manual.awp file is also covered by the GPL."#
+            #"Before accepting patches, the Antiweb project requires copyright assignment that allows us to relicense your modifications. You still keep full rights to your modifications and Antiweb will always be available under the GPL."#
+        )
+      )
+      (gcc-errors #"Why am I getting errors from gcc when compiling Antiweb?"#
+        #"Most likely you don't have all the header files installed. Some systems package header files separately from the libraries themselves. For example, on an Ubuntu machine you will need at least the following extra packages:"#
+        (pre #"$ sudo apt-get install libc6-dev zlib1g-dev"#)
+      )
+      (stats "How do I find out ...?"
+        #"If a process terminates unexpectedly, the first thing you should check is the syslog file:"#
+        (pre #"# tail /var/aw/aw_log/syslog"#)
+        #"The fastest and most reliable way to get info about what an Antiweb process is currently doing or how it is configured is to use the launch script's <b>-stats</b> command. For example, to get the stats of a running hub, run this command (as root):"#
+        (pre #"# antiweb -stats /var/aw"#)
+        #"Similarly, to get the stats of a worker process:"#
+        (pre #"# antiweb -stats /var/aw/worker.conf"#)
+        (ul #"When #(link "faq.html#ATTACH" "attached") to a process you can also get this info by evaluating <b>(stats)</b>."#)
+        #"For info on the memory consumption of an Antiweb process, use the <b>-room</b> command. This will give you information about the lisp managed heap, as well as Antiweb's special conn and ioblock data-structures:"#
+        (pre #"# antiweb -room /var/aw/worker.conf"#)
+      )
+      (local-config #"How can I change Antiweb build/install options?"#
+        #"As mentioned in #(link "install.html" "the installation instructions"), there are several variables that can be changed at the top of <b>build.lisp</b> that will change how Antiweb is built and installed. Although you can change the build options directly in this file, the recommended way is to create a <b>local.lisp</b> file in the Antiweb tarball directory. This way, when you upgrade Antiweb you can simply copy your existing <b>local.lisp</b> file into the new Antiweb directory."#
+        #"If it exists, <b>local.lisp</b> will be #(link "http://www.lispworks.com/documentation/HyperSpec/Body/f_load.htm" "load")ed before Antiweb is built. Antiweb build options can thus be changed by using the Common Lisp <b>setq</b> form."#
+        #"Here are some examples of <b>local.lisp</b> files:"#
+        (ul
+          #"Install Antiweb into the /usr/local/ prefix instead of /usr/: #(pre #"(setq aw-bin-dir "/usr/local/bin")
+(setq aw-lib-dir "/usr/local/lib")"#)"#
+          #"Compile Antiweb with your system's default BerkeleyDB (requires version 4.6+): #(pre #"(setq aw-use-bdb t)"#)"#
+          #"On a 64 bit machine, compile a 32 bit version of Antiweb when compiling with CMUCL, but a 64 bit version when compiling with any other lisp: #(pre #"#+cmu (setq aw-extra-cflags "-m32")"#) Note: Make sure you have 32 bit libc and zlib libraries available. On a Debian x86-64 machine try this command: #(pre #"# apt-get install ia32-libs libc6-dev-i386 lib32z1-dev"#)"#
+          #"On a 64 bit machine, compile a 32 bit version of Antiweb using a specific 32 bit BerkeleyDB install: #(pre #"(setq aw-use-bdb t)
+(setq aw-extra-cflags
+  "-m32 -L/usr/local/BerkeleyDB.4.7/lib/ -I/usr/local/BerkeleyDB.4.7/include/")"#)"#
+        )
+      )
+      (cache #"What is the cache directory for?"#
+        #"Workers can optionally have a <b>cache directory</b>. The worker conf has a #(link "worker.html#CACHE" "cache") xconf you need to enable if you want to use certain features:"#
+      (ul
+            #"When #(link "worker.html#GZIP" "gzip compression") is enabled, files of the appropriate extension and size are gzip compressed and stored to the cache the first time they are read, and again if their modification times change. HTTP clients that indicate they can handle gzip encoding are served the compressed data as regular static files."#
+            #"Every #(link "awp.html" "Anti Webpage") gets its own directory in the cache. After the page is compiled, it is stored and served out of the cache (along with a gzipped copy) until the modification time on the .awp file changes. The Anti Webpage will then be recompiled into the cache."#
+            #"For Anti Webpages that contain code in the form of AJAX callbacks, a lisp file is stored into the cache and compiled into a "fast load" file (.x86f or .fasl or .fas or .lib or .lx64fsl or ...). This file is loaded on the first request for the Anti Webpage, and is compiled and loaded again when the .awp file's modification time changes."#
+            #"When #(link "worker.html#JSMIN" "javascript minification") and/or #(link "worker.html#CSSMIN" "CSS minification") is enabled, javascript and/or CSS files will be minified, gzip compressed, and stored in the cache directory."#
+          )
+)
+      (reloading-worker-conf #"Do I need to restart a worker process to reload a worker conf file?"# #"No. Antiweb is designed so that you never need to restart any of its processes. To reload a worker conf file, even if the worker is chroot()ed and can no longer access the file, run this command (as root):"# (pre #"# antiweb -reload /var/aw/worker.conf"#) (ul #"The worker will not reset itself in any way during a reload. Even connections currently being sent files and keepalive connections will not be closed."# #"If an error is detected while installing the new conf file, the worker will not install it and will continue with the old configuration."# #"If an error is encountered in an HTTP dispatch with the new conf file, it will revert to the old conf file and close the connection that caused the error. This is called a #(link "faq.html#ROLLBACKS" "rollback")."#))
+      (adding-listeners #"Do I need to restart the hub to add new listeners?"#
+        #"No. You can start listening on a port in a supervisor process with root privileges and then transfer the listening socket into a running hub. To see the interfaces/ports currently being listened on, use the #(link "faq.html#STATS" "-stats") command:"#
+        (pre #"# antiweb -stats /var/aw
+...
+Listening on:
+  0.0.0.0 80
+  :: 80
+..."#) #"The above stats output means the hub is listening on all IPv4 and IPv6 interfaces for connections to port 80. This command adds a new listener for port 800:"#
+(pre #"# antiweb -add-listener /var/aw 0.0.0.0 800
+
+OK"#) #"And this closes a listener:"#
+(pre #"# antiweb -close-listener /var/aw 0.0.0.0 800
+
+OK"#))
+      (attach #"Can I attach to a running process and give it lisp commands?"#
+                 #"Yes, as long as you have root privileges you can <b>attach to</b> or <b>supervise</b> any Antiweb process through the hub's unix socket. Note that root privileges are dropped once you have attached to the target process. For example, to attach to the hub process, run this command (as root):"# (pre #"# antiweb -attach /var/aw"#) #"Similarly, to supervise a worker process, run this command (as root):"# (pre #"# antiweb -attach /var/aw/worker.conf"#) #"In both cases, you will be shown the output of the stats command run on that process, and then will be given a * prompt: #(pre #"[Antiweb: Attached to HUB] *"#) #(pre #"[Antiweb: Attached to worker HOYTECH] *"#) This is similar to a lisp #(link "http://en.wikipedia.org/wiki/REPL" "REPL"). The *, **, ***, +, ++, and +++ special variables are stored in the process you attached to and are unique per REPL session. The expressions are evaluated by the process being supervised. Although all Antiweb processes only have a single thread of execution, <b>a supervised process will continue to function normally while being supervised.</b>"#)
+      (reopen-log-files #"How can I get the hub to reopen its log files?"#
+        #"First of all, never send an Antiweb process a HUP signal. All communication with Antiweb is done via the <b>hub.socket</b> unix socket."#
+        #"To reopen the hub's log files, #(link "faq.html#ATTACH" "attach") to the hub process and evaluate <b>(reopen-log-files)</b>."#
+        #"For example, mv the log files to a new destination:"#
+        (pre #"# mv /var/aw/aw_log/* /storage/dir/"#)
+        #"Attach to the hub:"#
+        (pre #"# antiweb -attach /var/aw"#)
+        #"Then evaluate the <b>(reopen-log-files)</b> form at the Antiweb prompt:"#
+        (pre #"[Antiweb: Attached to HUB] *
+(reopen-log-files)
+
+T"#)
+        #"When finished, press control-d or use the <b>(quit)</b> command:"#
+        (pre #"[Antiweb: Attached to HUB] *
+(quit)
+
+# "#)
+        #"Note that this does not quit the process you are attached to. To do that, either use the <b>-kill</b> command or evaluate <b>(progn (quit))</b> when attached."#
+        #"Alternatively, especially when doing all this from a script, you might choose to use the <b>-reopen-log-files</b> command:"#
+        (pre #"# antiweb -reopen-log-files /var/aw"#)
+      )
+      (install-hub-rewrite-host #"Can I manually route requests to workers?"#
+        #"Yes, you can use an install-hub-rewrite-host xconf in the hub.conf file. This option should be given a lambda form. This lambda form accepts one argument: the entire HTTP request header as a string. The lambda form should return a virtual host that is being handled by a worker. If nil is returned, the virtual host requested in the Host header will be used as usual. Example:"#
+        (pre #";; Send hosts like jimmy.user.example.com to user-handler.example.com
+(install-hub-rewrite-host
+  (lambda (header)
+    (if (#~m/\r\nHost: [\w-]+[.]user[.]example[.]com\r\n/i header)
+      "user-handler.example.com")))
+"#)
+        (ul
+          #"This xconf is most useful in combination with the #(link "worker.html#HANDLE-ALL-HOSTS" ":handle-all-hosts") option in a worker conf handler."#
+          #"If you need to install a new rewrite function without restarting the hub, #(link "faq.html#ATTACH" "attach") to the hub and evaluate the install-hub-rewrite-host form."#
+        )
+      )
+      (erlang #"Was Antiweb inspired by Erlang?"# #"Not directly, no. Hoytech engineers have never looked at any Erlang implementations and have never programmed in Erlang. But we like what we hear. Antiweb's philosophy is similar to Erlang's in several respects:"# (ul #"If an unexpected condition is encountered, die as quickly and loudly as possible. Never try to clean-up or recover. A process cannot do that because it has failed. Some other process that hasn't failed will clean-up after it."# #"Threads (pre-emptively scheduled shared memory processes) are used nowhere. All inter-process communication is done by explicit message passing."#)
+)
+      (rollbacks "What are rollbacks?"
+        #"Antiweb is an <b>interactive</b> webserver. It is designed so that it can be reconfigured and developed without any interruption of service."#
+        #"Normally, in the event of an unexpected condition, Antiweb will die as quickly as possible. After an error, a process cannot continue functioning because it has failed. <b>Rollbacks</b> provide a way to stop the worker process from committing suicide if an error occurs in the HTTP dispatch function portion of the code."#
+        #"When a worker starts, it reads its conf file and compiles an HTTP dispatch function. If there is an error compiling the dispatch function, the worker simply will not start (see the syslog file for the reason)."#
+        #"Once the worker does start, no rollbacks are installed so any errors encountered in the HTTP dispatch function are treated like normal errors: they will terminate the worker process and log the reason to syslog. If you #(link "faq.html#RELOADING-WORKER-CONF" "-reload") a worker conf (and the new HTTP dispatch compiles OK), it will <b>push a rollback onto the rollback stack</b> if and only if there are no existing rollbacks. If there is later an error encountered inside the newly installed HTTP dispatch function, Antiweb will close the HTTP connection that caused the error (using a 500 Internal Server Error) and then will <b>rollback</b> to the old conf file instead of dying. This is a safety feature and how or if you use it is a <b>policy decision</b>."#
+        #"If all you ever do is -reload worker confs, only the original (oldest) conf file is available as a rollback. However, when you are #(link "faq.html#ATTACH" "attached to") a worker you can add or remove rollbacks manually with the following commands:"#
+        (ul #"<b>(push-rollback)</b> - Copies your current conf file and adds it as a rollback. You might want to add a comment to this rollback:<br><b>(push-rollback "adding the host rewrite rule")</b>"#
+            #"<b>(rollback)</b> - Installs the most recent rollback, overwriting the current HTTP dispatch function and conf file."#
+            #"<b>(pop-rollback)</b> - Removes the most recent rollback without installing it. Returns the rollback struct so you can save it somewhere if you want."#
+            #"<b>(pop-all-rollbacks)</b> - Removes all rollbacks. Returns a list of all rollback structs which you can save somewhere if you want."#
+        )
+        #"You can always get a list of the rollbacks available to a worker with the #(link "faq.html#STATS" "-stats") command:"#
+        (pre #"# antiweb -stats /var/aw/worker.conf
+...
+Rollbacks:
+  Rollback [changing rewrite rule] pushed 0d 1h 0m 4s ago
+  Rollback [adding new rewrite rule] pushed 0d 1h 1m 53s ago
+  Rollback [original] pushed 0d 2h 10m 25s ago
+...
+"#)
+        (ul #"Rollbacks only apply to errors encountered in the HTTP dispatch function. Errors elsewhere in Antiweb will immediately terminate the worker, regardless of rollbacks."# #"...except that errors resulting from compiling #(link "awp.html" "Anti Webpages") will never terminate the worker. Instead, the Anti Webpage is unavailable to clients until the .awp file is fixed (clients are sent a 500 Internal Server Error). See the syslog file for details why an Anti Webpage didn't compile."#)
+      )
+      (multiple-lisps #"Can I use multiple lisp environments at the same time?"# #"#(tip #"Caution: CLISP's readline can interfere with pasting in lisp forms. You can disable readline with the <b>-noreadline</b> option (must appear before the real command you are running). See #(link "faq.html#CLISP-LIMITATIONS" "CLISP Limitations")."#)Yes. Antiweb's "wire protocol" is independent of the lisp environment in use. #(ul #"The #(link "faq.html#STATS" "-stats") command lets you see the Common Lisp environment and version of any Antiweb process."# #"You can #(link "faq.html#ATTACH" "attach to") a CLISP process with CMUCL and vice-versa (except be careful of cross-platform problems like backquote expansions)."# #"If you have a 64 bit machine, you can run some Antiweb processes in 64 bit mode and others in 32 bit mode. See #(link "faq.html#LOCAL-CONFIG" "the local.lisp FAQ entry") for configuration examples."#)"# #"To install different lisp environments, simply follow the #(link "install.html" "installation instructions") for each of the desired lisp implementations. The antiweb launch script will default to using the <b>most recently installed</b> lisp environment. However, you can force a particular lisp environment with the -cmu, -clisp, or -ccl switches. For example:"# (pre #"# antiweb -cmu -hub /var/aw"#) #"or"# (pre #"# antiweb -clisp -worker /var/aw/worker.conf"#) #"Or if you want a REPL on a ClozureCL with all the Antiweb functions loaded:"# (pre #"$ antiweb -ccl -repl"#))
+      (worker-startup-time #"Why does it take a few seconds to start a worker?"# #"<b>Antiweb compiles parts of the system only once the worker's conf is loaded</b>. This adds a small compilation delay when starting worker processes. There are many advantages to having the compiler available at run-time, including more efficient HTTP dispatches that omit unused features and the ability to add new modules to workers (or shadow existing modules) without restarting them."# #"You usually will only notice this when using a slow computer, complicated config files, and a lisp environment with a slow compiler (like CMUCL)."#)
+      (reload-attack #"Can a compromised worker wait until I -reload to steal vhosts?"#
+        #"In theory it it possible for a compromised worker to "lie and wait" for you to -reload (which unlocks the worker process's connection to the hub) and then feed in extra unwanted vhosts for it to listen on. You should always <b>check the hub status with the #(link "faq.html#STATS" "-stats") command</b> after a -reload to make sure this hasn't happened (make sure the worker has the right vhosts and is locked). The effectiveness of this attack is diminished by the following two points:"#
+        (ul #"A worker cannot do this to steal vhosts being listened on by other workers. If a worker tries this, the hub will instantly cut it off (and log what happened)."# #"In no situations does this attack allow log messages to be intercepted."#)
+      )
+      (restarting-crashed-workers #"Will Antiweb automatically restart a crashed worker/hub?"#
+        #"No. Whether to do this or not is a <b>policy decision</b>, not a technical one."#
+        (ul #"A simple way to ensure that a worker is running is to try starting it with the <b>-check-worker</b> switch: #(pre #"# antiweb -check-worker /var/aw/worker.conf"#) The worker will only be started if it currently isn't running. <b>-check-worker</b> is identical to <b>-worker</b> except it will not add a log message in syslog if the worker was already running. For example, adding this line to your crontab will check that a particular worker is running every 15 minutes: #(pre #"0,15,30,45 * * * *   /usr/bin/antiweb -check-worker /var/aw/worker.conf"#)"# #"Once correctly configured, an Antiweb process should never crash. If it does, check the syslog file and please #(link "http://groups.google.com/group/antiweb" "let us know") in as much detail as possible what happened. You may have discovered a serious bug in Antiweb."#)
+      )
+      (etag-hash #"Can I stop the Etag header from leaking inode numbers?"#
+        #"Yes. You can use #(link "worker.html#ETAG-HASH" "Etag hashing"). This concatenates the Etag that is normally generated with a secret key, hashes with the SHA1 algorithm, and uses the result as the Etag."#
+        #"OpenBSD #(link "ftp://ftp.openbsd.org/pub/OpenBSD/patches/3.2/common/008_httpd.patch" "made a similar change to httpd") in version 3.2. They store the secret key in the file logs/etag-state but Antiweb stores it in the worker conf file <b>which should of course be stored outside of the HTML root</b>. Good secret keys include Antiweb session IDs:"#
+        (pre #"$ antiweb -repl
+
+* (aw-n-bit-session-id 128)
+
+"8odxf2wrq7tbehjkwvp0h7vqu"
+"#)
+        #"<b>aw-n-bit-session-id</b> will use /dev/arandom or /dev/urandom to seed the #(link "http://burtleburtle.net/bob/rand/isaacafa.html" "ISAAC random number generator") and return a random n-bit value in base 36. 128 bits is fine."#
+        #"Now add the following to a handler in your worker conf file:"#
+        (pre #"  :etags :etag-hash "8odxf2wrq7tbehjkwvp0h7vqu""#)
+        #"Hoytech does not use Etag hashing on our servers so you can snoop on our inodes if you want. The only plausible attack seems to involve NFS (Network File System). If you use NFS on your webserver, enable Etag hashing. To avoid the minor overhead, don't. Antiweb is all about choice."#
+      )
+      #+nil (continuations #"Does Antiweb use continuations?"# #"No. Hoytech's R&D team has never read any convincing arguments that continuations are useful for web development. Instead, continuations pose a number of determinism/reliability #(link "http://www.nhplace.com/kent/PFAQ/unwind-protect-vs-continuations-overview.html" "issues") that Antiweb avoids by not using them. Thankfully, Common Lisp does not force the burden of continuations upon application developers seeking to build reliable systems. <b>This is a valuable feature of Common Lisp.</b>"#)
+      (linger #"Why does Antiweb linger on HTTP sockets?"#
+        #"When terminating an HTTP connection with a "Connection: close" HTTP header, Antiweb will shutdown() the write direction of the socket and continue to read and discard data from the socket for up to 2 seconds. This is <b>required</b> for HTTP/1.1 persistent connections. See #(link "http://httpd.apache.org/docs/1.3/misc/fin_wait_2.html#appendix" "here") for more details."#
+        #"Note that Antiweb's maximum linger period (2 seconds) is much shorter than Apache's 30 seconds. Also, we don't use a SIGALRM. Instead, lingering sockets are tracked with Antiweb's regular connection state machine. We believe this is correctly implemented but please let us know if you encounter problems."#
+      )
+      (timeout-clustering #"What is timeout clustering?"#
+        #"This is an experimental optimisation in Antiweb4 that so far we have had good results with. The idea is that for many types of timeouts, including timing out keepalive connections, it doesn't really matter if they occur plus or minus a second or so. Antiweb takes advantage of this by scheduling the timeouts on a second boundary. So instead of the following sequence of syscalls:"#
+(pre #"kevent(200ms)
+close(socket)
+kevent(200ms)
+close(socket)
+kevent(200ms)
+close(socket)
+kevent(200ms)
+close(socket)
+kevent(200ms)
+close(socket)
+kevent()
+"#) #"Antiweb does:"#
+(pre #"kevent(1000ms)
+close(socket)
+close(socket)
+close(socket)
+close(socket)
+close(socket)
+kevent()
+"#) #"Notice how there are four fewer calls to kevent() with clustering. In addition to making fewer system calls, we also suspect this is better for power consumption."#
+      )
+      (ssl-proxy #"Does AW support SSL and/or reverse proxying?"# #"Not yet. Currently we recommend reverse proxying SSL connections to Antiweb with #(link "http://nginx.net" "nginx"). Eventually Antiweb will be both SSL capable and able to reverse proxy SSL."# #"Here is an nginx conf file that can be used for reverse proxying SSL (probably includes some things you don't need):"#
+(pre #"
+user  nginx;
+worker_processes  1;
+
+events {
+  worker_connections  1024;
+}
+
+http {
+  keepalive_timeout  65;
+  gzip on;
+  gzip_proxied any;
+  gzip_types application/x-javascript;
+
+  server {
+    listen   443;
+    server_name example.com;
+
+    ssl    on;
+    ssl_certificate    /etc/ssl/certs/example.crt;
+    ssl_certificate_key     /etc/ssl/private/example.key;
+
+    location / {
+      proxy_buffer_size 256k;
+      proxy_buffers 8 256k;
+      proxy_pass http://example.com;
+      proxy_set_header  X-Real-IP  $remote_addr;
+    }
+  }
+}
+"#)
+        #"In order to log the IP addresses of clients, you should use the #(link "worker.html#ACCEPT-X-REAL-IP-FROM" ":accept-x-real-ip") xconf for all workers that handle proxied connections."#
+)
+      (cmucl-limitations #"Are there any known limitations with CMUCL?"#
+        (ul
+          ;#"CMUCL currently needs to see the libantiweb32.so file in a system library directory when it saves the image. This means that on new systems where Antiweb has never been installed before, Antiweb/CMUCL needs to be built and installed twice. The #(link "install.html" "installation instructions") have details on how to do this. We are looking into a workaround for this."#
+          ;#"CMUCL will always load the libantiweb32.so library from a system library directory, even if Antiweb tells it to load a freshly compiled version from the bin/ directory. If you add a new function to libantiweb.c, you will need to delete the library from its system location prior to recompiling Antiweb. This is only a problem during development and when upgrading Antiweb. We are looking into a workaround for this."#
+          #"CMUCL mmap()s a large amount of address space which can stop it from running on certain VPS systems. Note that most of this address space doesn't map to real memory. The <b>-dynamic-space-size</b> doesn't seem to reduce the size of the mmap() unfortunately. SBCL does this, probably CMUCL can too."#
+        )
+      )
+      (clisp-limitations #"Are there any known limitations with CLISP?"#
+        (ul
+          #"CLISP's readline support can interfere with pasting in lisp forms (S-expressions). When attaching to a process, you may want to turn it off: #(pre #"# antiweb -noreadline -attach /var/aw/worker.conf"#) If you leave readline on, be aware that symbol completion will only find symbols in the supervisor process, not the process you have attached to."#
+          #"The filenames of #(link "design.html#CONFS" "conf files") (like .awp files) can only contain a subset of UTF-8. They can't include the * or ? code points because there seems to be #(link "http://osdir.com/ml/lisp.clisp.general/2003-04/msg00101.html" "no way") to open or read such files in CLISP. This doesn't affect static files or CGI scripts because Antiweb uses its own filesystem interface for those."#
+          #"On older versions of CLISP, certain HTTP headers will be terminated with only a newline, not a carriage-return + newline. Use CLISP 2.42 or newer."#
+          #"Some versions of CLISP seem to ignore the -repl switch so Antiweb's -repl command won't work with them. 2.42 seems to work but 2.44 doesn't."#
+          ;#"If you are used to CMUCL's handling of <b>top level setq</b>, be aware that CLISP does this differently. In Antiweb, this will be normalised to the CMUCL behaviour soon."#
+          #"If you use <b>-nodaemon</b> and press control-c to interrupt an Antiweb process, you get a functioning debugger REPL (just like CMUCL) but resuming the process when you are done debugging is problematic (unlike CMUCL, where it works perfectly). We are still tracking this issue down."#
+          #"<b>(lisp-implementation-version)</b> returns different information depending on whether it is a worker process or the hub process (you can observe this with -stats). We have no idea why this happens."#
+        )
+      )
+      (ccl-limitations #"Are there any known limitations with ClozureCL?"#
+        #"None currently known."#
+      )
+      (sbcl #"Is SBCL supported?"# #"Currently no. #(link "http://www.sbcl.org" "SBCL") is an <b>experimental fork</b> of CMUCL. We have had problems with several versions of SBCL in the past, but eventually Antiweb will probably run on SBCL. If you port Antiweb to SBCL, we recommend building a single-threaded lisp image."#
+      )
+      (skillz #"Can you teach me l33t k0ding skillz?"# #"Yes, yes we can. Please refer to Doug Hoyte's book #(link "http://letoverlambda.com" "Let Over Lambda") for details on many of the coding techniques used in Antiweb4."#)
+    )
+)
+
+
+(page "worker.html"
+  :title "Antiweb Manual: Worker Conf File Reference"
+  :header #"<h1><u>Worker Conf File Reference</u></h1>"#
+  :inherit "index.html"
+  :content
+(p
+  #>END
+Every worker process must have a worker conf file. See the #(link "install.html" "installation instructions") for step-by-step instructions on setting up a worker. The most important elements in a worker conf are the #(link "#HANDLER" "handler") elements. #(tip #"There are several worker conf skeletons available. See a list of them by running <b>antiweb</b> with no arguments."#)Every virtual host that is to be handled must appear in exactly one handler in all your worker confs. If a vhost exists in two separate worker confs, the latest worker to register the duplicate vhost with the hub is killed (see syslog). If a vhost exists in two separate handlers in the same worker, only the first handler will handle the vhost.END
+  #"Here is a simple worker conf:"#
+  (pre #"
+(worker example)
+(hub-dir "/var/aw")
+(max-fds 32767)
+(uid 20001)
+
+(handler
+  :hosts ("localhost" "127.0.0.1"
+          "example.com" "www.example.com")
+  :root "/var/www/example.com"
+  :index ("index.html")
+  :etags
+  :cgi (pl)
+)
+"#)
+(sections
+  (worker "worker" "Unique name for the worker process." (pre "(worker name)") (ul "Cannot be changed without restarting worker." "This xconf is required."))
+  (hub-dir "hub-dir" "Absolute path to the hub directory that this worker should attempt to connect to." (pre #"(hub-dir "/var/aw")"#) (ul "Cannot be changed without restarting worker." "This xconf is required." "Because worker processes connect to the hub before a chroot, this option is unaffected by chroot."))
+  (uid "uid" "UID and GID to drop privileges to. Can be either a number or the name of a user." (pre "(uid 20001)") (pre #"(uid "user")"#) (ul "Cannot be changed without restarting worker." "This xconf is required." "The GID is always the same as the UID."))
+  (max-fds "max-fds" "Before dropping privileges, set the maximum open file descriptor limit." (pre "(max-fds 32768)") (p (tip #"To see how many file descriptors any process is limited to, along with how many it is currently using, use #(link "faq.html#STATS" "-stats"). The number of open descriptors is an estimate because there are a few open but unaccounted for descriptors not part of Antiweb's connection data structures."#) (ul "Cannot be changed without restarting worker." "This xconf is optional but highly recommended if you anticipate moderate load and/or many keepalive connections." #"On some systems you may need to raise a system-wide process descriptor limit for this option to be effective. For example, on OpenBSD use this sysctl command: #(pre #"# sysctl kern.maxfiles=32768"#)"#)))
+  (chroot "chroot" "This xconf is optional. If and only if it is present, the worker will chroot() to this directory before dropping privileges. Workers always chdir() to / (even if they don't chroot)." (pre #"(chroot "/absolute/path/to/chroot/to")"#) (ul "Cannot be changed without restarting worker." "If you use chroot note that most of the other paths in the worker conf will need to be relative to this new root (but still must begin with a slash)." #"Whether you should chroot your workers or not is a <b>policy decision</b>. If you chroot a worker, be aware that you will need to set up a "fake root" to run most CGI scripts."#))
+  (cache "cache" #"Absolute path to the cache directory for this worker. For more details on the cache, see #(link "faq.html#CACHE" "this FAQ entry")."# (pre #"(cache "/absolute/path/to/cache")"#) (ul #"The cache directory must be owned by the worker's UID. No other user should be able to write to the cache directory and it should never be in /tmp and should never have a sticky bit."# "If the worker is choot()ed, the cache directory must be inside the chroot() and the given path must be relative to the new root." "Although providing a cache directory is optional, it is required to use gzip content encoding, javascript/CSS minification, or Anti Webpages." "Delete everything in the worker's cache directory before performing major directory re-organisations. The worker may die (details always logged in syslog) if what used to be a directory is now a file, etc."))
+  (keepalive "keepalive" "Amount of time before closing an inactive HTTP keepalive connection. The parameter is a number followed by one of these unit specifiers: s, m, h, or d." (pre "(keepalive 65 s)") (ul "The default, 65 seconds, is slightly longer than the keepalive time of most browsers (same as nginx)."))
+  (eval-every "eval-every" #"A recurring timer event. Multiple eval-every events can appear in the same worker conf (potentially with different time values). The parameters are a number followed by one of these unit specifiers: s, m, h, or d, and the lisp forms to evaluate in sequence."#
+(pre #"(eval-every 6 h
+  (gc))"#) (ul "Designed for periodically flushing expired session IDs etc." "The event does not trigger on worker start-up, but only after its first time period has elapsed." #"A #(link "faq.html#RELOADING-WORKER-CONF" "-reload") will reset the timers."#))
+  (handler "handler"
+    "The handler xconf tells Antiweb where your files are and how to serve them. Multiple handler xconfs can exist in the same worker conf file. The simplest possible handler is a basic mapping of a virtual host to an HTML tree:"
+    (pre #"(handler
+  :hosts ("localhost")
+  :root "/absolute/path/to/root"
+)"#)
+    #"This section outlines the many handler parameters. All parameters are optional, except for :hosts and <b>one of</b> :root or :simple-vhost-root."#
+    (sections
+      (hosts ":hosts" "Which virtual hosts should be registered with the hub." (pre #"  :hosts ("example.com" "www.example.com" "www.example.com:8080")"#) (ul "This parameter is required otherwise the hub will not route any connections to this handler." "Make sure you specify all hosts this worker should handle, including sub-domains, ports, IPv4 and IPv6 addresses, etc." "Two separate handlers <b>cannot</b> both handle the same host (only the first defined will get connections)."))
+      (handle-all-hosts ":handle-all-hosts" "Handle hosts even if they aren't specified in :hosts." (pre #"  :handle-all-hosts"#) (ul #"A handler that uses this option should appear last in the worker conf because no handlers specified later in the file will have a chance to handle the request."# #"This option is only useful when combined with the #(link "faq.html#INSTALL-HUB-REWRITE-HOST" "install-hub-rewrite-host") xconf in hub.conf."#))
+      (root ":root" "Absolute path to the HTML tree that should be served." (pre #"  :root "/absolute/path/to/root""#) (ul "One of (but not both) a :root or a :simple-vhost-root argument is required." "If the worker process is chroot()ed, it must be the absolute path from the new root, not the original root."))
+      (simple-vhost-root ":simple-vhost-root" "Absolute path to a directory containing HTML trees named by the virtual hosts being served. The names of these child directories must be names of registered vhosts for this worker." (pre #"  :simple-vhost-root "/absolute/path/to/root""#) (ul "One of (but not both) a :simple-vhost-root or a :root argument is required." "If the worker process is chroot()ed, it must be the absolute path from the new root, not the original root." "The mere fact that a directory exists is not enough to register a virtual host. Make sure that all hosts are registered in the :hosts parameter." "The directory names should be the lowercase versions of the virtual hosts." "You can use symlinks so that multiple virtual hosts are mapped to the same directory." #":simple-vhost-root is for #(link "http://hcsw.org/awhttpd/" "Antiweb3") and #(link "http://trac.lighttpd.net/trac/wiki/Docs%3AModSimpleVhost" "lighttpd") compatibility."#))
+      (rewrite ":rewrite" #"#(tip #"Although :rewrite can do much more than just rewrite request paths, it is named in recognition of Apache's #(link "http://httpd.apache.org/docs/2.0/mod/mod_rewrite.html" "mod_rewrite")."#):rewrite lets you compile Common Lisp code directly into the worker's HTTP dispatch function. You can have as many :rewrite parameters as you want. They are evaluated in sequence or until the connection is <b>redirected</b> or until <b>(done-rewrite)</b> or <b>(keepalive)</b> is evaluated. The rewriting happens before any other request processing is done. Here is a simple example that will redirect domains that start with www to their no-www versions:"#
+(pre #"
+  :rewrite (if-match (#~m/^www[.](.*)/ http-host)
+             (redir 301 "http://~a~a" $1 http-path))
+"#)
+ #"When redirecting a connection to a different worker or a different server altogether, you might choose to redir-close which tears down HTTP 1.1 keepalive connections:"#
+(pre #"
+  :rewrite (if-match (#~m/^www[.](.*)/ http-host)
+             (redir-close 301 "http://~a~a" $1 http-path))
+"#)
+  #"Supported codes for :redir and :redir-close are:"# (ul #"301 - Moved Permanently"# #"302 - Found"# #"307 - Temporary Redirect"#)
+  #"There are many variables that you can access and even modify before the request is handled. Here is a partial list:"#
+  (ul #"http-method - The requested HTTP method. Always the symbol GET or the symbol POST."#
+      #"http-ver - The HTTP protocol version in use. Either "0.9", "1.0", or "1.1"."#
+      #"http-path-encoded - The path portion of the URL before URL decoding."#
+      #"http-path - The decoded path portion of the URL. This will always begin with a / character. This will include the path-info portion of the path."#
+      #"http-args - The URL encoded URL arguments (portion of URL after the ? character, not including the ?)."#
+      #"http-host - The lowercase version of the virtual host requested by the client."#
+      #"$u-anything-you-like - These are #(link "http://letoverlambda.com" "magic") variables. You can use them for anything, including sharing values between rewrite rules or other Antiweb modules. They are initially bound to nil."#
+      #"$h-any-http-header - These are extra-magic variables. You can use them to access any HTTP header. To be honest, they are regular expressions. $h-referr?er will contain the contents of a Referer or Referrer header line (whichever appears first)."#
+  )
+  #"The form <b>add-header-to-response</b> adds an HTTP header to any successful response:"#
+  (pre #"
+  :rewrite
+    (if-match (#~m|^/logo[.]png$| http-path)
+      (add-header-to-response "Cache-Control: public, max-age=3600, must-revalidate"))
+"#)
+  #"Here is how to use :rewrite to add a virtual URL <b>/stats.html</b> that will display stats and room info about a worker process:"#
+(pre #"
+  :rewrite
+    (if-match (#~m|^/stats[.]html$| http-path)
+      (let ((body (format nil #"<html><title>Antiweb Worker Stats</title>
+                                <h1>Antiweb Worker Stats</h1>
+                                <h2>-stats</h2><pre>~a</pre><br>
+                                <h2>-room</h2><pre>~a</pre></html>"#
+                              (stats) (aw-room))))
+        (send-http-response-headers 200
+          ("Content-Type" "text/html; charset=utf-8")
+          ("Content-Length" "~a" (length body)))
+        (send-raw body)
+        (keepalive)))
+"#)
+  #"The above is a low-level way of building an HTML response, sending it to the client, and keeping the connection alive (HTTP/1.1 clients only). Another way this could have been written is with the <b>send-html-response-and-keepalive</b> macro:"#
+(pre #"
+  :rewrite
+    (if-match (#~m|^/stats[.]html$| http-path)
+      (send-html-response-and-keepalive
+        #"<html><title>Antiweb Worker Stats</title>
+          <h1>Antiweb Worker Stats</h1>
+          <h2>-stats</h2><pre>"#
+        (stats)
+        #"</pre><br><h2>-room</h2><pre>"#
+        (aw-room)
+        #"</pre></html>"#))
+"#)
+  #"Soon there will be more :rewrite recipes available here, in the #(link "faq.html" "FAQ"), and elsewhere."#
+  (ul #"<b>Never paste something you don't understand into a conf file.</b>"#)
+)
+      (default-mime-type ":default-mime-type" "Sets the default MIME type for files with unrecognised extensions (or no extensions at all)." (pre #"  :default-mime-type "text/plain; charset=utf-8""#))
+      (mime-type ":mime-type" "A two element list. The first element is a file extension and the second is the MIME type and optionally charset to map the extension to." (pre #"  :mime-type (htm "text/html; charset=iso-8859-1")"#) (ul "You can over-ride a default Antiweb MIME type with this parameter." "The file extensions are case-insensitive." #"There can be multiple :mime-type options in a handler. The first one that matches is used."#))
+      (index ":index" "A list of index files to be searched for when a directory is requested." (pre #"  :index ("index.html" "index.pl")"#) (ul "The first index file found is the one used (left-to-right)." "A 404 Not Found is served if no index is found (unless :dir-listings are enabled)."))
+      (dir-listings ":dir-listings" "If no index file is found, this option causes an HTML listing of the files in a directory to be served instead of a 404." (pre #"  :dir-listings"#) (ul "Directory listings always tear down persistent HTTP connections to prevent recursive crawlers from taking advantage of HTTP pipelining."))
+      (download-resuming ":download-resuming" "Enables the sending of 206 Partial Content if the client indicates it already has a prefix range of a static file." (pre #"  :download-resuming"#) (ul #"No other byte-ranges are supported."#))
+      (etags ":etags" "Enables the sending of etag (entity tag) HTTP headers when serving static files. Clients that cache the files are sent 304 Not Modified responses if they re-request the file and it hasn't changed." (pre #"  :etags"#) (ul #"Antiweb uses the standard(ish) etag format "INODE-SIZE-MTIME" (in hex)."# #"Last-Modified is never sent by Antiweb."#))
+      (etag-hash ":etag-hash" "Uses the SHA1 algorithm to disguise the Etag generated with :etags to avoid exposing your inode numbers. Requires a secret key value."  (pre #"  :etags :etag-hash "key value goes here""#) (ul #"You must also enable the :etag xconf for this to work."# #"See #(link "faq.html#ETAG-HASH" "this FAQ entry") for more information."#))
+      (accept-x-real-ip-from ":accept-x-real-ip-from" "A trusted IP address that is permitted to set a connection's IP address with the X-Real-IP header. This is so that the client's IP address will be properly logged when reverse proxying is used." (pre #"  :accept-x-real-ip-from "127.0.0.1""#) (ul #"#(link "faq.html#SSL-PROXY" "This FAQ entry") describes an example nginx configuration that sends this header when reverse proxying SSL connections."#))
+      (gzip ":gzip" "A list of file extensions for files that should be gzip compressed and stored in the worker's cache directory and then served as static files. Only clients that indicate compression support are sent the compressed versions." (pre #"  :gzip (html txt css js)"#) (ul "The gziped copies are updated when the original file's modification time (mtime) changes." "There is no point compressing formats like png and mp3 because they are already compressed."))
+      (gzip-size-range ":gzip-size-range" #"A list of two elements. The first is the minimum file size (in bytes) to compress and store in the cache. The second is the maximum file size (also in bytes)."# (pre #"  :gzip-size-range (256 1000000)"#) (ul "This parameter is optional. If :gzip is used without :gzip-size-range, sensible defaults are used."))
+      (jsmin ":jsmin" #"Enables "javascript minification". Files that end in .js in your HTML root will be minified, gzip compressed, and stored in the cache. Minification removes comments, unnecessary whitespace, etc from your javascript files for more efficient use of bandwidth and faster loading pages."# (pre #"  :jsmin"#) (ul #"When the modification time (mtime) of the original .js file changes, the file will be re-minified on the next request."# #"jsmin.lisp was written by Ury Marshak for ht-ajax. It is based on an algorithm by #(link "http://javascript.crockford.com/jsmin.html" "Douglas Crockford")."# #"Invalid javascript files, such as ones that forget to close comments, are not minified. Instead, the original files are sent to clients."# #":js-main fields in AWP files have their contents minified when the AWP file is compiled."#))
+      (cssmin ":cssmin" #"Enables "CSS minification". Files that end in .css in your HTML root will be minified, gzip compressed, and stored in the cache. Minification removes comments, unnecessary whitespace, etc from your CSS files for more efficient use of bandwidth and faster loading pages."# (pre #"  :cssmin"#) (ul #"When the modification time (mtime) of the original .css file changes, the file will be re-minified on the next request."# #"cssmin is based on #(link "http://www.thinkvitamin.com/features/webapps/serving-javascript-fast" "an algorithm by Cal Henderson")."# #":css fields in AWP files have their contents minified when the AWP file is compiled."#))
+      (fast-1x1gif ":fast-1x1gif" "Adds a URL that serves a 1 pixel by 1 pixel transparent gif." (pre #"  :fast-1x1gif "/1x1.gif""#) (ul "The gif and its pre-generated HTTP headers are served directly from memory. This eliminates a stat call, generating the headers, opening the file, reading from the file, and closing the file." #"The 43 byte gif file is from #(link "http://wiki.codemongers.com/NginxHttpEmptyGifModule" "nginx")."#))
+      (fast-files ":fast-files"
+        #"A list of URLs that should be served directly from a memory cache:"#
+        (pre #"  :fast-files ("/favicon.ico" "/robots.txt")"#)
+        (ul "After they are first read, these files and their pre-generated HTTP headers are served directly from a cache in memory. This eliminates a stat call, generating the HTTP headers, opening the file, reading from the file (or mmap()+munmap()ing it), and closing the file."
+            #"When the worker conf file is #(link "faq.html#RELOADING-WORKER-CONF" "-reload")ed, the memory cache is flushed and the files are then re-loaded from the filesystem on-demand. Alternatively, to avoid the slight delay when you re-compile your HTTP dispatch function (and the created #(link "faq.html#ROLLBACKS" "rollback")), you can evaluate <b>(flush-fast-files)</b> while #(link "faq.html#ATTACH" "attached to") a worker."#
+            #"If Antiweb is unable to access one of the fast files, pre-generated 404s are subsequently sent without even consulting the filesystem (this is called <b>negative caching</b>). Unlike normal 404s, these will not tear down a persistent connection and will pipeline just fine."#
+            #"You can see how many fast files, fast 404s, and bytes are currently in a worker's fast-file memory cache with the #(link "faq.html#STATS" "-stats") command. The byte count includes pre-generated HTTP headers."#
+            #"If simple-vhost-root is used, each vhost will have its own memory cache."#
+            #"Only small files should be cached in memory. Medium and large files are usually served optimally from the filesystem."#
+))
+      (fast-files-header ":fast-files-header"
+        #"HTTP headers to add to #(link "worker.html#FAST-FILES" ":fast-files") served files."#
+        (pre #"  :fast-files-header "Cache-Control: public, max-age=3600, must-revalidate""#)
+)
+      (cgi ":cgi" "A list of file extensions to treat as CGI scripts." (pre #"  :cgi (pl php)"#) (ul #"The extensions are case-insensitive."# #"See #(link "design.html#CGI-PROCESS" "Design of CGI Processes in Antiweb4") for details."#))
+      (naked-cgi ":naked-cgi" "A list of file extensions to treat as naked CGI scripts." (pre #"  :naked-cgi (npl)"#) (ul #"The extensions are case-insensitive."# #"Naked CGI scripts are identical to regular CGI scripts except Antiweb will not prefix the following: #(pre #"HTTP/1.1 200 OK\r\nConnection: close\r\n"#) The script must send this prefix itself."# #"Naked CGI scripts are similar to #(link "http://htmlhelp.com/faq/cgifaq.2.html#6" "NPH") (No Parsed Headers)."#))
+      (cgi-maxfiles ":cgi-maxfiles" #"Limit the number of file descriptors a CGI or naked CGI process may have open at once:"# (pre #"  :cgi-maxfiles 100"#) (ul #"If not specified, a sensible default value is used."# #"This value must be smaller than the worker's #(link "worker.html#MAX-FDS" "max-fds") value."#))
+      (cgi-no-forking ":cgi-no-forking" #"Use the NPROC resource limit to ensure that CGI or naked CGI processes launched from this handler cannot fork()."# (pre #"  :cgi-no-forking"#) (ul #"This option negates certain common mistakes in CGI scripts. For example, a bug that allows an attacker to launch system() or shell "backquotes" will result in the fork() call failing."# #"This a very restrictive option and will prevent many perfectly legitimate CGI scripts from working. If you don't understand exactly what this does, you probably don't need it."# #"We may add additional CGI resource limits in the future. Let us know which you find most useful."#))
+      (awp ":awp" "Enable Anti Webpages." (pre #"  :awp"#) (ul #"Worker must have a #(link "faq.html#CACHE" "cache directory")."# #"Because all code required to compile and serve Anti Webpages is stored in the lisp image, you can #(link "worker.html#CHROOT" "chroot") workers that use :awp."# #"Anti Webpages are affected by the #(link "worker.html#ETAGS" ":etags") and #(link "worker.html#GZIP" ":gzip") options just like regular static files."# #"See #(link "awp.html" "Anti Webpages") for more details."#))
+    )
+  )
+))
+)
+
+
+
+(page "awp.html"
+  :title "Antiweb Manual: Anti Webpages"
+  :header #"<h1><u>Anti Webpages</u></h1>"#
+  :inherit "index.html"
+  :content (p
+    (awp-guiding-principles)
+    #"Anti Webpages are an experimental and innovative new way of creating web content. The server portion of Antiweb is separate from Antiweb Pages and is more straightforward--all it has to do is implement HTTP 1.1 as efficiently and securely as possible.#(tip #"Installing an .awp file is as easy as copying it into an Antiweb HTML root, making sure the worker has a #(link "faq.html#CACHE" "cache directory"), and adding #(link "worker.html#AWP" ":awp") to the worker's conf. However, you can also compile an .awp file with the launch script's -awp command even if no Antiweb server is running."#) This stuff is kinda crazy. Antiweb Pages are unstable meaning their exact specification will change over time (but we think we're pretty close)."#
+    #"The point of Anti Webpages is to create static HTML files which can be served very efficiently by Antiweb. Although they support AJAX callbacks and flat-file or BerkeleyDB data-stores, Anti Webpages revolve around static content and that is all this manual currently describes."#
+
+(sections
+  (pages-and-layouts "Pages and Layouts"
+    #"An Anti Webpage is a file that ends in .awp. Like almost all of Antiweb's files, .awp files are #(link "design.html#CONFS-AND-XCONFS" "confs"). Each .awp file maps to an .awp/ <b>directory</b> on your website. There can be multiple pages inside this directory, each indicated with an xconf. Here is a simple .awp file with one <b>page</b> xconf:"#
+(pre #"
+(page "index.html"
+  :layout #"
+content                        |
+"#
+  :content #"Hello world!"#
+)
+"#)
+    (ul #"Strings can be delimited with regular double quotes (") or with the special #" and "# quotes. These special quotes allow you to insert quote characters, backslashes, etc, without having to escape them."#
+        #"The :layout option positions the segments of the awp file. There must be at least one line terminated with a vertical bar (|). All lines must be terminated by vertical bars except blank lines. All the vertical bars should "line up"."#
+    )
+    #"The :layout option positions the segments of the awp file. There must be at least one line terminated with a vertical bar (|). The above code positions the :content segment in the middle of the page. Multiple bars can be used to indicate more specific positioning. For example, the following code "bounds" :content in a right-most portion of the page:"#
+(pre #"
+(page "index.html"
+  :layout #"
+                     | content |
+"#
+  :content #"Hello world!"#
+)
+"#)
+    #"Alternatively, you can use the locator modifier (@) to position a segment within its area. The following is similar to the previous example:"#
+(pre #"
+(page "index.html"
+  :layout #"
+content@r                      |
+"#
+  :content #"Hello world!"#
+)
+"#)
+    #"@r means it should positioned at the right of its area. The possible modifiers are @r @l @t @b @tl @tr @bl @br (though the letter arrangements don't matter). Here is a more complicated example:"#
+(pre #"
+(page "index.html"
+  :title "Antiweb Manual"
+
+  :layout-width 800
+  :layout #"
+logo@r |  |          header@l         |  slogan  |
+nav@rt |  |          content@tl                  |
+                       footer                    |
+"#
+
+  :header #"<h1><u>Antiweb Manual</u></h1>"#
+)
+"#)
+    #"When the above .awp file is rendered, there is one segment displayed (:header) and the rest are NIL because you haven't added them yet. There are some special keywords that don't relate to the layout:"#
+    (ul #"<b>:title</b> - This is the page's HTML title."#
+        #"<b>:css</b> - CSS code. There can be multiple :css parameters. They are all added to a CSS block at the top of the rendered HTML page."#
+        #"<b>:js</b> - Javascript code. There can be multiple :js parameters. They are all added to a Javascript block at the top of the rendered HTML page."#
+        #"<b>:js-end</b> - Identical to <b>:js</b> except the code is added to a Javascript block at the bottom of the page, not the top."#
+    )
+  )
+  (inheritance "Inheritance"
+ #"Because it is so common to want to "re-use" parts of other pages, Anti Webpages support <b>page inheritance</b>. This is different from the inheritance of #(link "design.html#CONFS" "conf files") and is only given the same name to add to the general confusion. Of course .awp files are confs so you can use that inheritance too. You can even inherit pages across inherited .awp files."# #"Here is how you use page inheritance:"#
+(pre #"
+(page "index.html"
+  :title "my title"
+  :layout #"
+     | header |                |
+content@r                      |
+"#
+  :header "my site"
+  :content #"my content"#
+)
+
+(page "other.html"
+  :inherit "index.html"
+  :content #"my other content"#
+)
+"#)
+  #"Now, when other.html is rendered, it is exactly the same as index.html except for the :content parameter. This parameter has been <b>over-ridden</b> or <b>shadowed</b>. What happens is the xconf for index.html is appended on to the end of other.html's xconf. When Antiweb goes to render other.html, it only looks for the first parameter named :content so it gets the shadowing one."#
+  (ul #"Any parameter can be inherited or shadowed, including :layout and :title."#
+      #"Since Antiweb takes all :css, :js, and :js-end parameters, not just the first ones it finds, all CSS and JS code is inherited."#
+  )
+)
+  (super-glue "Super-Glue"
+ #"So what are these things we're passing as arguments? They are lisp strings. But they don't need to be. They can be anything and Anti Webpages will <b>super-glue</b> them into HTML. There are several built-in list forms provided. For example, p takes any amount of arguments and will wrap HTML &lt;p&gt; tags around each one:"#
+(pre #"
+(page "other.html"
+  :inherit "index.html"
+  :content (p "pargraph 1"
+              #"paragraph 2"#
+              (p #"subparagraph"#)
+           )
+)
+"#)
+  #"But another way you could have done that is by giving a string and then <b>unquoting</b> a list-based expression inside that string. If super-glue finds the sequence of characters # and then ( followed by a terminating ) later inside a string, it will treat it as a list form and will super-glue it too:"#
+(pre #"
+(page "other.html"
+  :inherit "index.html"
+  :content #"
+             #(p "pargraph 1"
+                 #"paragraph 2"#
+                 (p #"subparagraph"#)
+              )
+           "#
+)
+"#)
+  #"<b>There is no bottom.</b>"#
+  #"Anti Webpages don't care if you use HTML. The two previous examples could both have been written like this:"#
+(pre #"
+(page "other.html"
+  :inherit "index.html"
+  :content #"
+<p>pargraph 1</p>
+<p>pargraph 2</p>
+<p><p>subparagraph</p></p>
+"#
+)
+"#)
+  (ul
+    #"You can create your own glue types like <b>p</b> with the <b>defglue</b> form. Glue types added in an .awp file are local to that .awp file only."#
+  )
+)
+  (super-glue "More Info"
+  #"<i>Ya ok you guys are nuts but that sounds pretty cool.</i>"#
+  #"For more info see the following files:"#
+  (ul #"src/manual.awp - The .awp file for the manual you are reading now."#
+      #"src/awp.lisp - The implementation of Anti Webpages."#
+      #"src/glue.lisp - Default glue types included with Antiweb."#
+  )
+)
+
+)
+)
+)

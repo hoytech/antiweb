@@ -1,0 +1,76 @@
+Sec:
+
+!! limit on # conns from same ip (per worker? per worker AND in the hub? relevant at all for ipv6?)
+do fstats after opening the log files and make sure they are the same inodes as when we did the lstats
+try to crash AW by truncating a file while it is being sent (with and without mmap())
+?? -ftrapv
+
+
+Got this log when I forgot to add a cache dir. make the error less confusing.
+PUBLIC 1229745356 WORKER FATAL: aw_stat_returning_a_static_struct: path must be absolute, not NIL/XYZ.com/sitemap.xml.gz
+
+
+AWP Tasks:
+
+browsing to an .awp file should check that the cached dir exists in case it was deleted
+all .awp files are re-compiled on start-up. should compare mtimes of aw_load.lisp vs the .awp file
+      EXCEPT that ajax callbacks must be loaded always and only way to do that is compile the awp atm
+
+
+Tasks:
+
+check to see if CCL can use *, ?, and : in pathnames
+normalise CCL prompt
+-graceful-kill and -upgrade
+supervising non-existing process should show error instead of doing nothing
+trying to reload conf for unattached worker should show error instead of doing nothing
+trying to load same worker twice should display error instead of doing nothing
+(reset-all-timers) and (trigger-all-timers)
+fast-files should cache gzipped content for applicable files if enabled
+fast-files should handle etags if enabled
+easy way to check if file/directory exists in :rewrite rules, like -f in apache rewrite
+
+?? throttling
+?? basic auth
+?? rollbacks should capture current HTTP modules too
+?? -kill should log
+?? -kill should say "OK" - would need to be special cased cause process can't send back confirmation (it has been killed)
+?? check owner/group of cache directory - (will fatal() on write anyways, why die if you have a bad cache you're NOT USING?)
+?? open /dev/null descriptor for use even after chroot to stfu lisp compiler when running in -nodaemon mode
+?? verbose stats for workers that lists all connected IPs, number of requests, keepalive duration, etc
+
+
+
+CLISP issues:
+  * can't read in all UTF-8 strings *** invalid byte #xCE in CHARSET:ASCII conversion
+  * can't create or open files with * or ? characters
+      http://osdir.com/ml/lisp.clisp.general/2003-04/msg00101.html
+  * normalise clisp top-level setq behaviour over -attach with cmucl's behaviour
+  * ?? make -noreadline default -- readline considered harmful: can fuck up s-expression pasting
+
+
+API:
+
+?? #"#"# should be "#"
+?? USE_EPOLL -> AW_LINUX, USE_KQUEUE -> AW_BSD
+?? merge state change with aw_event_update
+
+
+Opt:
+
+!! create separate logger process so hub is completely non-blocking
+!! doubly linked conn lists to remove the 1 remaining O(N) operation
+
+O_NOATIME on linux
+special case: when there are exactly 2 events to run and one of them is a message to
+   the hub (like pipelined log msgs), do the OTHER ONE first to increase responsiveness and log pipeline
+stat "cache" (not really a cache just optimises duplicate stat() calls away--would help in 2 places so far)
+write-to-conn-from-lisp-string could avoid an ioblock prealloc if there is enough space in current ioblock
+eliminate worker-conn-table and inet-conn-table hash lookups on conn destruction
+pre-malloc conn and ioblock structs as contiguous (but aligned) memory.
+
+?? fd and mapped memory cache
+?? only flush log messages to hub every N requests to increase pipeline
+?? cgis should manually close all descriptors so we don't need to make every socket close on exec
+?? inherit close on exec and non-blocking to avoid syscalls (BSD only?)
+?? try readv()ing into more than just 2 ioblocks for HTTP conns - should almost never matter. check this

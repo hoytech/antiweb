@@ -1,0 +1,182 @@
+4.0BETA14   Jun 14, 2009
+
+* Bugfix: Sometimes a "Connection: close" header wouldn't be
+  sent when closing an HTTP connection.
+* Bugfix: When the http dispatch function encounters an error
+  and there are no rollbacks installed, unwind the stack before
+  calling fatal.
+* Bugfix: Worked around CMUCL "double install" annoyance by
+  modifying system::*global-table* before the image is saved.
+* Feature: Major BerkeleyDB enhancements. DBs can now be
+  concurrently accessed from multiple Antiweb processes.
+* Feature: New hub.conf xconf: install-hub-rewrite-host.
+  This option allows you to install a function in the hub
+  which routes requests to arbitrary virtual hosts.
+* Feature: New worker.conf handler option :handle-all-hosts.
+  This causes the given handler to handle all virtual hosts
+  sent to it, even if they were not specified in :hosts.
+* Feature: New function aw-fork-and-exec which is a simple
+  way to run external processes independent of the CGI system.
+  Zombies are reaped just like with CGI processes.
+* Feature: Antiweb version is now displayed in -stats.
+* Feature: Passwords are now hashed with 1000 iterations of SHA-1
+  in order to slow down offline password cracking in the event
+  that an Antiweb password database is stolen. This change makes
+  the current Antiweb incompatible with old password databases.
+* Change: aw-128-bit-session-id renamed to aw-n-bit-session-id
+  and now returns lower-case IDs.
+
+
+4.0BETA13   Feb 21, 2009
+
+* Feature: Naked CGI scripts:
+  http://hoytech.com/antiweb/manual.awp/worker.html#NAKED-CGI
+* Bugfix: In awp.lisp use valign=middle, not valign=center.
+* Bugfix: Rare race condition that could cause workers to
+  fail an assertion and exit. Could only reproduce on FreeBSD.
+* Bugfix: Send a 403 Forbidden if a directory in the HTML root
+  isn't readable instead of terminating worker.
+
+
+4.0BETA12   Jan 13, 2009
+
+* Feature: Optional Etag hashing for hiding inode information
+  in Etag headers.
+* Feature: :accept-x-real-ip option added for handlers in
+  worker conf. This is so that reverse proxied connections
+  from a trusted IP can set an X-Real-IP header which will
+  contain the client's IP for logging purposes.
+* Feature: :x-real-ip parameter for get and post handlers
+  in AWP pages.
+* Docs: FAQ entry describing Etag hashing:
+  http://hoytech.com/antiweb/manual.awp/faq.html#ETAG-HASH
+* Docs: Example nginx SSL reverse proxy configuration file:
+  http://hoytech.com/antiweb/manual.awp/faq.html#SSL-PROXY
+
+
+4.0BETA11   Dec 30, 2008
+
+* Port: ClozureCL support.
+* Bugfix: ClozureCL sometimes wouldn't display statistics
+  because it didn't like us passing a "N/A" string to the
+  ~1$ format arg in the stats function. 
+* Bugfix: The libantiweb shared library is now always compiled
+  as position independent code (gcc -fPIC).
+* Feature: Added aw-bits variable. It is 32 on ILP32 machines
+  and 64 on LP64 machines (AW supports nothing else).
+* Feature: Prints out architecture info detected during build.
+* Feature: libantiweb.so is now installed as either
+  libantiweb32.so or libantiweb64.so, allowing both 32 and
+  64 bit Antiweb systems to be installed simultaneously.
+* Feature: Lisp executable configuration variables added.
+  Now you can use lisp systems with custom executable names.
+* Docs: Updated install docs about new libantiweb file names
+  and ClozureCL support.
+* Docs: Documented local.lisp build configuration feature.
+  See faq.html#LOCAL-CONFIG.
+* Docs: Updated faq.html#MULTIPLE-LISPS. Yes, you can run
+  some 32 bit processes and some 64 bit processes in the
+  same Antiweb system.
+* Docs: Changed hyperspec links to lispworks.com because
+  lisp.org's are gone.
+
+
+4.0BETA10   Dec 20, 2008
+
+* Bug fix: If directory listings were enabled, requests for
+  CGI files using PATH_INFO would return 404.
+* Bug fix: Now handles EINTR errors from open().
+* Bug fix: No longer bother checking for EINTR errors
+  from close(). See the comment in the my_close() function
+  for details.
+* Bug fix: Now handles errors like ECONNABORTED from accept().
+* Bug fix: Now handles ECONNRESET from shutdown().
+* Bug fix: Fixed rare "perfect storm" bug related to handling
+  EINTR signals wrong in the event loop.
+* Feature: aw-bin-dir and aw-lib-dir are now variables
+  instead of constants so they can be overridden in
+  local.lisp.
+* Feature: aw-mkdir-dash-p lisp wrapper for aw_mkdir_dash_p.
+* Feature: Minor header file tweaks for FreeBSD support.
+* Docs: Added instructions for the CMUCL "double install"
+  procedure to the manual. See install.html.
+
+
+4.0BETA9   Nov 25, 2008
+
+* Bug fix: jsmin.lisp used :overwrite where it should have
+  used :supersede which could cause corrupted javascript
+  files to be sent if :jsmin was enabled.
+* Bug fix: When using jsmin.lisp, malformed javascript code
+  (unclosed comments and such) would throw an error and
+  terminate AW. Malformed javascript files are now sent
+  un-minified.
+* Bug fix: When transfering a connection over a unix socket,
+  certain buffer sizes would cause an assertion to fail and
+  AW to terminate.
+* Feature: Incorporated improved #>-reader into
+  bundled/lol.lisp from Martin Dirichs.
+* Feature: Javascript code included in the :js-main fields
+  of AWP files is now minified.
+* Feature: There is now a :cssmin option that is similar to
+  :jsmin. It uses Cal Henderson's CSS minification algorithm.
+  When :cssmin is enabled, CSS files in your HTML root are
+  minified, gzip compressed, and stored in the cache. :css
+  fields of AWP files are always minified.
+* Feature: The antiweb Perl launch script now accepts the
+  option -eval. This option requires an argument. The
+  argument will be treated as a lisp expression and will
+  be evaluated by an antiweb lisp image. Once complete,
+  the lisp image will (quit).
+
+
+4.0BETA8   Oct 27, 2008
+
+* EAGAIN is always handled and logged.
+* with-bdb-checkout API changes:
+  * Default is now :read-only t (use :write-out t)
+  * with-bdb-checkout is now a progn form
+  * :cached is gone
+* bdb-get-all serialises keys now
+* Added bdb-iterate and bdb-collect
+* Can't use symbols in bdb keys now
+* with-bdb-transaction no longer auto-checkpoints
+* Added MIME type for .deb
+* There is now an aw-extra-cflags parameter that can be
+  setq in local.lisp
+* AWP cleaned up. See awp-reserved-options variable for
+  all the xconf options.
+* $ip now holds client's IP in :rewrite phase
+* ip can be used in get-handler and post-handler
+* Added jsmin.lisp by Ury Marshak to bundled/
+* Added :jsmin for automatic javascript minification
+* axslogs now include referer and user-agent
+
+
+4.0BETA7   Sep 29, 2008
+
+* Uses either the kqueue() or epoll() stateful event APIs
+  in level-triggered mode
+* 10,000 inactive keepalive connections consume about 3M
+  of userspace memory
+* Connection sockets are transferred between processes with
+  sendmsg() for privilege-separated vhosts and SMP support
+* Files are mmap()ed to avoid copying file data to userspace
+* Vectored IO (aka scatter-gather IO) used everywhere
+* Vhosts can be chroot()ed into separate roots
+* Compromised vhosts can't intercept log messages created
+  by other vhosts or steal connections destined to other vhosts
+* Every Antiweb process is separately exec()ed (not fork()ed) so
+  each has its own unique memory randomisation offsets
+* Write direction of socket is shutdown() when closing connection
+  (required for HTTP/1.1 persistent connections)
+* Native IPv6 support
+* Conditional CGI/1.1 compliance
+* CGI processes can be restricted with rlimits
+* Directory listings
+* Entity tags
+* Gzipped encoded content is cached to the filesystem and then
+  served as static content
+* Apache-like regexp-based rewrite module
+* Memcached-like memory cache module
+* Integrated BerkeleyDB support

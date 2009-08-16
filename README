@@ -1,0 +1,32 @@
+Antiweb (C) Doug Hoyte
+
+Antiweb is a webserver written in Common Lisp, C, and Perl by
+Doug Hoyte and Hoytech. For the full manual see:
+
+http://hoytech.com/antiweb/manual.awp/
+
+Antiweb is licensed under the GNU GPL v3. See the file COPYING
+for details.
+
+Installation summary:
+
+Building:
+  CMUCL: lisp -quiet -load build.lisp
+  CLISP: clisp -q build.lisp
+  ClozureCL: ccl64 -Q -l build.lisp
+
+Installing:
+  cd bin
+  sudo ./install.sh
+
+Building hub directory (20000 is the hub UID):
+  sudo antiweb -skel-hub-dir 20000 /var/aw
+
+Creating worker conf (file *requires* editing):
+  sudo antiweb -skel-worker-basic > /var/aw/myworker.conf
+
+Starting hub (might want to add to start-up script):
+  sudo antiweb -hub /var/aw
+
+Starting worker (might want to add to start-up script):
+  sudo antiweb -worker /var/aw/myworker.conf

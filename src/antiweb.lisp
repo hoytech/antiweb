@@ -867,7 +867,7 @@
 (defun worker-unix-connect (checking)
   (let ((c (cffi:with-foreign-string (fstr (format nil "~a/hub.socket" aw-hub-dir))
              (aw_conn_unix fstr))))
-    (setf hub_log c)
+    (setf hub_conn c)
     (write-to-conn-from-string c
       (format nil "~aworker ~a~%~{register-host ~a~%~}lock~%" 
         (if checking "check-" "")
@@ -1483,7 +1483,7 @@
            (to-unreg (set-difference orig-hosts new-hosts :test #'equalp))
            (to-reg (set-difference new-hosts orig-hosts :test #'equalp))
            (update-str (format nil "~{unregister-host ~a~%~}~{register-host ~a~%~}lock~%" to-unreg to-reg)))
-      (write-to-conn-from-string hub_log update-str)))
+      (write-to-conn-from-string hub_conn update-str)))
   (if (> (length aw-rollbacks) 1)
     (pop-rollback)) ; when reloading, only keep rollback if there are no previous rollbacks
   (setf aw-worker-conf tp-worker-conf)

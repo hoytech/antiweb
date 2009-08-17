@@ -73,7 +73,8 @@ char *sep_http = "\r\n\r\n";
 FILE *syslog_file = NULL;
 FILE *axslog_file = NULL;
 int axslog_file_needs_fflushing = 0;
-struct conn *hub_log = NULL;
+struct conn *hub_conn = NULL;
+struct conn *logger_conn = NULL;
 
 
 struct conn *next_timeout_ptr=NULL;
@@ -112,13 +113,13 @@ static void fatal(const char *fmt, ...) {
   if (syslog_file) {
     fprintf(syslog_file, "HUB FATAL: %s\n", buf);
     fflush(syslog_file);
-  } else if (hub_log) {
+  } else if (hub_conn) {
     worker_write_log_msg("syslog", "WORKER FATAL: ", buf);
 
-    make_socket_blocking(hub_log->sd);
+    make_socket_blocking(hub_conn->sd);
 
-    while(hub_log->outlen)
-      do_vectored_write_to_sd(hub_log);
+    while(hub_conn->outlen)
+      do_vectored_write_to_sd(hub_conn);
   } else {
     fprintf(stderr, "FATAL: %s\n", buf);
   }
@@ -280,7 +281,7 @@ void aw_unalloc_conn(struct conn *c) {
   struct conn *tpc;
   int i;
 
-  if (hub_log == c || c == NULL)
+  if (hub_conn == c || c == NULL)
     _exit(-1);
 
   if (c->conntype == 0)
@@ -2463,7 +2464,7 @@ static void worker_write_log_msg(char *cmd, char *prefix, char *log_msg) {
   struct ioblock *b;
   int len, plen, mlen;
 
-  if (hub_log == NULL) _exit(-1);
+  if (hub_conn == NULL) _exit(-1);
 
   plen = strlen(prefix);
   mlen = strlen(log_msg);
@@ -2493,13 +2494,13 @@ static void worker_write_log_msg(char *cmd, char *prefix, char *log_msg) {
     mlen -= AW_IOBLOCK_SIZE-len;
   }
 
-  if (hub_log->out == NULL) {
-    hub_log->out = hub_log->outp = b;
+  if (hub_conn->out == NULL) {
+    hub_conn->out = hub_conn->outp = b;
   } else {
-    hub_log->outp->next = b;
-    hub_log->outp = b;
+    hub_conn->outp->next = b;
+    hub_conn->outp = b;
   }
-  hub_log->outlen += b->len;
+  hub_conn->outlen += b->len;
 
   while (*log_msg) {
     int amt;
@@ -2519,13 +2520,13 @@ static void worker_write_log_msg(char *cmd, char *prefix, char *log_msg) {
     log_msg += amt;
     mlen -= amt;
 
-    hub_log->outp->next = b;
-    hub_log->outp = b;
+    hub_conn->outp->next = b;
+    hub_conn->outp = b;
 
-    hub_log->outlen += amt;
+    hub_conn->outlen += amt;
   }
 
-  aw_event_update(hub_log);
+  aw_event_update(hub_conn);
 }
 
 void aw_worker_write_syslog_msg(char *log_msg) {

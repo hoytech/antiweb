@@ -153,4 +153,5 @@ extern char *sep_single_newline;
 extern char *sep_http;
 extern FILE *syslog_file;
 extern FILE *axslog_file;
-extern struct conn *hub_log;
+extern struct conn *hub_conn;
+extern struct conn *logger_conn;

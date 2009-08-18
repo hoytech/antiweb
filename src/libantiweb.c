@@ -70,9 +70,6 @@ int fatal_has_already_been_called=0;
 char *sep_single_newline = "\n";
 char *sep_http = "\r\n\r\n";
 
-FILE *syslog_file = NULL;
-FILE *axslog_file = NULL;
-int axslog_file_needs_fflushing = 0;
 struct conn *hub_conn = NULL;
 struct conn *logger_conn = NULL;
 
@@ -89,8 +86,7 @@ struct kevent events[AW_EVENT_BATCH_SIZE];
 
 static void do_vectored_write_to_sd(struct conn *c);
 static void make_socket_blocking(int sd);
-static void worker_write_log_msg(char *cmd, char *prefix, char *log_msg);
-static void log_syslog_msg(char *fmt, ...);
+static void aw_logf(char *file, char *prefix, char *fmt, ...);
 
 
 static void fatal(const char *fmt, ...) {
@@ -101,6 +97,10 @@ static void fatal(const char *fmt, ...) {
   if (fatal_has_already_been_called) _exit(-1);
   fatal_has_already_been_called = 1;
 
+  fprintf(stderr, "FATAL: %s\n", buf);
+
+  if (logger_conn == NULL) _exit(-1);
+
   va_start(ap, fmt);
   vsnprintf(buf, sizeof(buf), fmt, ap);
   va_end(ap);
@@ -110,19 +110,12 @@ static void fatal(const char *fmt, ...) {
   for(i=0; i<len; i++)
     if ((buf[i] & 0xff) < 32 || (buf[i] & 0xff) > 127) buf[i] = '?';
 
-  if (syslog_file) {
-    fprintf(syslog_file, "HUB FATAL: %s\n", buf);
-    fflush(syslog_file);
-  } else if (hub_conn) {
-    worker_write_log_msg("syslog", "WORKER FATAL: ", buf);
+  aw_log("syslog", hub_conn ? "WORKER FATAL: " : "HUB FATAL: ", buf);
 
-    make_socket_blocking(hub_conn->sd);
+  make_socket_blocking(logger_conn->sd);
 
-    while(hub_conn->outlen)
-      do_vectored_write_to_sd(hub_conn);
-  } else {
-    fprintf(stderr, "FATAL: %s\n", buf);
-  }
+  while(logger_conn->outlen)
+    do_vectored_write_to_sd(logger_conn);
 
   _exit(-1);
 }
@@ -281,7 +274,7 @@ void aw_unalloc_conn(struct conn *c) {
   struct conn *tpc;
   int i;
 
-  if (hub_conn == c || c == NULL)
+  if (c == hub_conn || c == logger_conn || c == NULL)
     _exit(-1);
 
   if (c->conntype == 0)
@@ -663,7 +656,7 @@ static void do_vectored_read_from_sd(struct conn *c) {
     if (rv == -1 && errno == EINTR) goto again;
 
     if (rv == -1 && errno == EAGAIN) {
-      log_syslog_msg("do_vectored_read_from_sd: EAGAIN (%d)", c->conntype);
+      aw_logf("syslog", "", "do_vectored_read_from_sd: EAGAIN (%d)", c->conntype);
       return;
     }
 
@@ -937,7 +930,7 @@ static void do_vectored_write_to_sd(struct conn *c) {
     if (rv == -1 && errno == EINTR) goto again;
 
     if (rv == -1 && errno == EAGAIN) {
-      log_syslog_msg("do_vectored_write_to_sd: EAGAIN (%d)", c->conntype);
+      aw_logf("syslog", "", "do_vectored_write_to_sd: EAGAIN (%d)", c->conntype);
       return;
     }
 
@@ -2416,6 +2409,7 @@ void aw_daemonise_drop_terminal() {
     fatal("aw_daemonise: chdir: %s", strerror(errno));
 }
 
+/*
 void aw_hub_reopen_log_files() {
   // Note: On error we just exit because we have already daemonised and there is nowhere to log!
   if (syslog_file)
@@ -2432,7 +2426,6 @@ void aw_hub_reopen_log_files() {
   axslog_file = fopen("/axslog", "a");
   if (axslog_file == NULL) _exit(-1);
 }
-
 
 static void hub_write_log_msg(FILE *fp, char *worker, char *log_msg) {
   int i,len;
@@ -2459,12 +2452,15 @@ void aw_hub_write_axslog_msg(char *worker, char *log_msg) {
   axslog_file_needs_fflushing = 1;
 }
 
+*/
 
-static void worker_write_log_msg(char *cmd, char *prefix, char *log_msg) {
+
+
+void aw_log(char *file, char *prefix, char *log_msg) {
   struct ioblock *b;
   int len, plen, mlen;
 
-  if (hub_conn == NULL) _exit(-1);
+  if (logger_conn == NULL) _exit(-1);
 
   plen = strlen(prefix);
   mlen = strlen(log_msg);
@@ -2477,7 +2473,7 @@ static void worker_write_log_msg(char *cmd, char *prefix, char *log_msg) {
   free_ioblocks = free_ioblocks->next;
   b->next = NULL;
 
-  len = snprintf(b->data, AW_IOBLOCK_SIZE-1, "%s %d\n%s", cmd, mlen+plen, prefix);
+  len = snprintf(b->data, AW_IOBLOCK_SIZE-1, "log %s %d\n%s", file, mlen+plen, prefix);
   if (len == -1 || len >= AW_IOBLOCK_SIZE-1) _exit(-1);
 
   b->offset = 0;
@@ -2494,13 +2490,13 @@ static void worker_write_log_msg(char *cmd, char *prefix, char *log_msg) {
     mlen -= AW_IOBLOCK_SIZE-len;
   }
 
-  if (hub_conn->out == NULL) {
-    hub_conn->out = hub_conn->outp = b;
+  if (logger_conn->out == NULL) {
+    logger_conn->out = logger_conn->outp = b;
   } else {
-    hub_conn->outp->next = b;
-    hub_conn->outp = b;
+    logger_conn->outp->next = b;
+    logger_conn->outp = b;
   }
-  hub_conn->outlen += b->len;
+  logger_conn->outlen += b->len;
 
   while (*log_msg) {
     int amt;
@@ -2520,28 +2516,17 @@ static void worker_write_log_msg(char *cmd, char *prefix, char *log_msg) {
     log_msg += amt;
     mlen -= amt;
 
-    hub_conn->outp->next = b;
-    hub_conn->outp = b;
+    logger_conn->outp->next = b;
+    logger_conn->outp = b;
 
-    hub_conn->outlen += amt;
+    logger_conn->outlen += amt;
   }
 
-  aw_event_update(hub_conn);
-}
-
-void aw_worker_write_syslog_msg(char *log_msg) {
-  worker_write_log_msg("syslog", "", log_msg);
-}
-
-void aw_worker_write_axslog_msg(char *log_msg) {
-  worker_write_log_msg("axslog", "", log_msg);
+  aw_event_update(logger_conn);
 }
 
 
-
-
-// This function is static to this file only. It can log either from the hub or the worker.
-static void log_syslog_msg(char *fmt, ...) {
+static void aw_logf(char *file, char *prefix, char *fmt, ...) {
   va_list ap;
   char buf[2048];
 
@@ -2549,11 +2534,7 @@ static void log_syslog_msg(char *fmt, ...) {
   vsnprintf(buf, sizeof(buf), fmt, ap);
   va_end(ap);
 
-  if (syslog_file) {
-    aw_hub_write_syslog_msg("HUB", buf);
-  } else {
-    aw_worker_write_syslog_msg(buf);
-  }
+  aw_log(file, prefix, buf);
 }
 
 

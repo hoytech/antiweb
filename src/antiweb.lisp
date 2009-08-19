@@ -72,7 +72,7 @@
   (let ((rb (pop-rollback)))
     (setq aw-worker-conf (rollback-conf rb))
     (setf (symbol-function 'http-user-dispatch) (rollback-dispatch rb))
-    (worker-syslog #"ROLLBACK: ~a (~a)"# (describe-rollback rb) (or condition "manual rollback"))
+    (aw-log () #"ROLLBACK: ~a (~a)"# (describe-rollback rb) (or condition "manual rollback"))
     (format nil #"installed ~a (~a)"# (describe-rollback rb) (or condition "manual rollback"))))
 
 (defun pop-all-rollbacks ()
@@ -83,14 +83,12 @@
   'ok)
 
 
-(defun worker-syslog (fmt &rest args)
-  (cffi:with-foreign-string (fstr (apply #'format nil fmt args))
-    (aw_worker_write_syslog_msg fstr)))
 
-(defun hub-syslog (fmt &rest args)
-  (cffi:with-foreign-string (fstr "HUB")
-    (cffi:with-foreign-string (fstr2 (apply #'format nil fmt args))
-      (aw_hub_write_syslog_msg fstr fstr2))))
+(defun aw-log ((&key (log-file "syslog") (prefix "")) fmt &rest args)
+  (cffi:with-foreign-string (fstr-log-file log-file)
+    (cffi:with-foreign-string (fstr-prefix prefix)
+      (cffi:with-foreign-string (fstr-msg (apply #'format nil fmt args))
+        (aw_log fstr-log-file fstr-log-file fstr-prefix fstr-msg)))))
 
 
 
@@ -661,7 +659,7 @@
         (setf done t)
         (let ((c (cffi:make-pointer k)))
           (cffi:with-foreign-slots ((conntype) c conn)
-            (hub-syslog "closed inet listener ~a ~a" bind-addr port)
+            (aw-log () "closed inet listener ~a ~a" bind-addr port)
             (setf conntype AW_CONNTYPE_ZOMBIE)
             (aw_touch_conn c 0)
             (remhash k inet-conn-table)))))
@@ -795,7 +793,7 @@
                 (if (or (null worker-name) (eq worker-name 'hub) (lookup-conn-pointer-from-worker-name worker-name))
                   (progn
                     (if (zerop (length $1))
-                      (hub-syslog "worker ~a already registered" $2))
+                      (aw-log () "worker ~a already registered" $2))
                     (setf conntype AW_CONNTYPE_ZOMBIE)
                     (aw_touch_conn c 0)
                     'worker-already-regged)
@@ -810,14 +808,14 @@
                 (when-match (#~m/^register-host ([\w.:_-]+)\n$/ shared-input-buffer)
                   (if (gethash (cffi:pointer-address c) locked-worker-table)
                     (progn
-                      (hub-syslog "locked worker ~a tried to register-host ~a"
+                      (aw-log () "locked worker ~a tried to register-host ~a"
                                   (gethash (cffi:pointer-address c) worker-conn-table) $1)
                       (setf conntype AW_CONNTYPE_ZOMBIE)
                       (aw_touch_conn c 0)
                       'connection-was-locked)
                     (if (gethash $1 host-to-conn-dispatch-table)
                       (progn
-                        (hub-syslog "worker ~a tried to register-host ~a but this is already registered"
+                        (aw-log () "worker ~a tried to register-host ~a but this is already registered"
                                     (gethash (cffi:pointer-address c) worker-conn-table) $1)
                         (setf conntype AW_CONNTYPE_ZOMBIE)
                         (aw_touch_conn c 0)
@@ -845,7 +843,7 @@
                   (let ((p (lookup-conn-pointer-from-worker-name (read-from-string $1))))
                     (if (null p)
                       (progn
-                        (hub-syslog "tried to transfer to unknown worker: ~a" $1)
+                        (aw-log () "tried to transfer to unknown worker: ~a" $1)
                         (setf conntype AW_CONNTYPE_ZOMBIE)
                         (aw_touch_conn c 0)
                         'no-such-worker-to-transfer-to)
@@ -855,10 +853,10 @@
                 (when-match (#~m/^add-listener ([\w:.]+) (\d+)\n$/ shared-input-buffer)
                   (hub-start-inet-listener $1 (parse-integer $2) (aw_accept_conn c 0 AW_CONNTYPE_INETLISTENER))
                   (write-to-conn-from-string c (format nil "ok~%"))
-                  (hub-syslog "adding inet listener ~a ~a" $1 $2)
+                  (aw-log () "adding inet listener ~a ~a" $1 $2)
                   hub-unix-handler)))
             (progn
-              (hub-syslog "bad connection to hub")
+              (aw-log () "bad connection to hub")
               (setf conntype AW_CONNTYPE_ZOMBIE)
               (aw_touch_conn c 0)
               'bad-cmd-from-connection-to-hub-socket))))))))
@@ -875,7 +873,7 @@
         (flatten
           (mapcar (lambda (h) (xconf-get h :hosts))
                   (conf-get-all aw-worker-conf 'handler)))))
-    (worker-syslog "worker connected")
+    (aw-log () "worker connected")
     (add-to-conn-table c
       (fsm worker-unix
         (cffi:with-foreign-slots ((ready sep currsep limit) c conn)
@@ -1212,13 +1210,12 @@
     (cffi:translate-from-foreign ip :string)))
 
 (defun worker-axslog (method host path args ip referer user-agent)
-  (cffi:with-foreign-string
-    (fstr (fformat nil #"~a ~a ~a~a~a~a "~a" "~a""# ip method host path
+  (aw-log (:log-file "axslog") #"~a ~a ~a~a~a~a "~a" "~a""#
+                                          ip method host path
                                           (if (and args (plusp (length args))) "?" "")
                                           (or args "")
                                           (#~s/"/?/ (or referer ""))
                                           (#~s/"/?/ (or user-agent ""))))
-      (aw_worker_write_axslog_msg fstr)))
 
 (defun http-user-dispatch-macro-request-handler (handler)
   `(when (or (,(http-hosts-to-regexp handler) http-host)
@@ -1415,7 +1412,7 @@
 
   ;; Unprivileged
   (reopen-log-files)
-  (hub-syslog "hub started")
+  (aw-log () "hub started")
   (handler-bind ((error (lambda (condition)
                           (fatal "run-hub: running: ~a" condition))))
     (format t "Hub started. Entering event-loop...~%")
@@ -1462,7 +1459,7 @@
   (push-rollback "original")
   (handler-bind ((error (lambda (condition)
                           (pop-rollback)
-                          (worker-syslog "problem reloading worker conf: ~a. Ignoring reload request" condition)
+                          (aw-log () "problem reloading worker conf: ~a. Ignoring reload request" condition)
                           (return-from reload-worker-conf nil))))
     (unless (equal (conf-get aw-worker-conf 'worker) (conf-get tp-worker-conf 'worker)) (error "worker name changed"))
     (unless (equal (conf-get aw-worker-conf 'hub-dir) (conf-get tp-worker-conf 'hub-dir)) (error "hub directory changed"))
@@ -1487,7 +1484,7 @@
   (if (> (length aw-rollbacks) 1)
     (pop-rollback)) ; when reloading, only keep rollback if there are no previous rollbacks
   (setf aw-worker-conf tp-worker-conf)
-  (worker-syslog "reloaded worker conf")
+  (aw-log () "reloaded worker conf")
   'ok)
 
 

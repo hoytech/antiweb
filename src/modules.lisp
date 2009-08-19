@@ -85,7 +85,7 @@ body,h1 { margin:10px; font-family: Verdana, Arial, sans-serif; }
                  (cache-path (format nil "~a/~a~a" aw-worker-cache ,(car (xconf-get handler :hosts)) http-path)))
              (let ((awp-compile-result (awp-compile-error-wrapper awp-file-path (aw_stat_get_mtime stat) cache-path)))
                (when (stringp awp-compile-result)
-                 (worker-syslog "failed .awp request: (~a) ~a" awp-file-path awp-compile-result)
+                 (aw-log () "failed .awp request: (~a) ~a" awp-file-path awp-compile-result)
                  (err-and-linger 500 "Anti Webpage didn't compile. See syslog.")))
              (setq $u-awp-real-path (format nil "~a~a" cache-path (if (= 1 (length $u-path-info))
                                                                     "/index.html" $u-path-info)))

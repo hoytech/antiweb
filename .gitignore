@@ -1,0 +1,7 @@
+*.x86f
+*.sse2f
+*.fasl
+*.lib
+*.fas
+bin/
+src/libantiweb-h.lisp

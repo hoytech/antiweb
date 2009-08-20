@@ -354,8 +354,7 @@ Password:
             ;#"<i>If using CMUCL, you will now need to repeat the build and install process a second time (go back to step 4). This is because when your image is saved, the libantiweb32.so shared library must be available as a system library. For more details, see #(link "faq.html#CMUCL-LIMITATIONS" "this FAQ entry").</i>"#
          )
          (p #"Antiweb should now be installed. Next create a hub directory:"#
-            (pre #"# antiweb -skel-hub-dir 20000 /var/aw"#)
-            #"The first argument to -skel-hub-dir (20000 above) is the UID that you plan to run the hub as. OPTIONAL: If you have a user created, you can give the user name instead of a UID number."#
+            (pre #"# antiweb -skel-hub-dir /var/aw"#)
             #"The hub directory you specified should have been created. OPTIONAL: You can now edit the created hub.conf file (ie <b>/var/aw/hub.conf</b>)."#
          )
          (p #"You now need to create one or more worker conf files. They can be stored anywhere, but a good place is along with the hub.conf file in the hub directory:"#

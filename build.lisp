@@ -276,7 +276,7 @@ Antiweb Launch Script - (C) Doug Hoyte
   antiweb [optional flags] -command [parameters]
 
 Installation Skeletons:
-  antiweb -skel-hub-dir <hub user> <hub directory to create>
+  antiweb -skel-hub-dir <hub directory to create>
   antiweb -skel-worker-basic
   antiweb -skel-worker-full
   antiweb -skel-worker-chrooted
@@ -440,17 +440,15 @@ if ($switch eq "-hub") {
   die ".awp files can't be compiled to the same directory they are stored" if (-f $dirtomake);
   exec_lisp("(progn (do-aw-init nil) (unwind-protect (awp-compile \"$awpfile\" 0 \"$basedir/$name\") (quit)))");
 } elsif ($switch eq "-skel-hub-dir") {
-  $user = shift or die "need a username/UID number for the hub";
   $dir = shift or die "need a directory to create for the hub";
 
   die "$dir already exists" if (-e $dir);
-  $user_lisp_format = $user;
-  $user_list_format = "\"$user\"" unless $user =~ m/^\d+$/;
   mkdir($dir) or die "unable to mkdir: $dir";
   mkdir("$dir/aw_log") or die "unable to mkdir: $dir/aw_log";
   system("chown $user:$user $dir/aw_log");
   skel_to_file("$dir/hub.conf", <<END);
-(uid $user_lisp_format)
+(hub-uid 20000)
+(logger-uid 20001)
 (max-fds 10000)
 (listen "0.0.0.0" 80)
 END
@@ -460,7 +458,7 @@ print <<END;
 (worker example)
 (hub-dir "/var/aw")
 (max-fds 32767)
-(uid 20001)
+(uid 20100)
 
 (handler
   :hosts ("localhost" "127.0.0.1"

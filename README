@@ -19,8 +19,11 @@ Installing:
   cd bin
   sudo ./install.sh
 
-Building hub directory (20000 is the hub UID):
-  sudo antiweb -skel-hub-dir 20000 /var/aw
+Building hub directory:
+  sudo antiweb -skel-hub-dir /var/aw
+
+Optionally edit hub conf file:
+  sudo vi /var/aw/hub.conf
 
 Creating worker conf (file *requires* editing):
   sudo antiweb -skel-worker-basic > /var/aw/myworker.conf

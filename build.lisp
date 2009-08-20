@@ -442,13 +442,17 @@ if ($switch eq "-hub") {
 } elsif ($switch eq "-skel-hub-dir") {
   $dir = shift or die "need a directory to create for the hub";
 
+  $hub_user = 20000
+  $logger_user = 20001
+
   die "$dir already exists" if (-e $dir);
   mkdir($dir) or die "unable to mkdir: $dir";
   mkdir("$dir/aw_log") or die "unable to mkdir: $dir/aw_log";
-  system("chown $user:$user $dir/aw_log");
+  system("chown $logger_user:$logger_user $dir/aw_log");
+  mkdir("$dir/empty") or die "unable to mkdir: $dir/empty";
   skel_to_file("$dir/hub.conf", <<END);
-(hub-uid 20000)
-(logger-uid 20001)
+(hub-uid $hub_user)
+(logger-uid $logger_user)
 (max-fds 10000)
 (listen "0.0.0.0" 80)
 END

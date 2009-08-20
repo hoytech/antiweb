@@ -827,14 +827,11 @@
                   (if (eql (gethash $1 host-to-conn-dispatch-table) (cffi:pointer-address c))
                     (remhash $1 host-to-conn-dispatch-table))
                   hub-unix-handler)
-                (when-match (#~m/^(sys|axs)log (\d+)\n$/ shared-input-buffer)
+                (when-match (#~m/^log ([\w-_.]+) (\d+)\n$/ shared-input-buffer)
                   (read-fixed-length-message-from-conn-and-store-in-shared-input-buffer (parse-integer $2)
-                    (cffi:with-foreign-string (log-msg shared-input-buffer)
-                      (cffi:with-foreign-string (worker (symbol-name
-                                                          (gethash (cffi:pointer-address c) worker-conn-table)))
-                        (if (string= $1 "sys")
-                          (aw_hub_write_syslog_msg worker log-msg)
-                          (aw_hub_write_axslog_msg worker log-msg))))
+                    (let ((worker-name (worker (symbol-name
+                                                 (gethash (cffi:pointer-address c) worker-conn-table)))))
+                      (aw-log (:log-file $1 :prefix worker-name) "~a" shared-input-buffer))
                     hub-unix-handler))))
             (when (not (gethash (cffi:pointer-address c) worker-conn-table)) ;; cmds NOT available to workers
               (or

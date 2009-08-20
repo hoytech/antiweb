@@ -1356,24 +1356,68 @@
     (dolist (i (conf-get-all aw-hub-conf 'listen))
       (hub-start-inet-listener (cadr i) (caddr i)))
     (hub-start-unix-listener (format nil "~a/hub.socket" aw-hub-dir))
-    (cffi:with-foreign-string (pstr (format nil "~a/aw_log" aw-hub-dir))
-      (let ((hub-uid (aw-lookup-user-name-with-getpwnam (conf-get aw-hub-conf 'hub-uid)))
-            (max-fds (conf-get aw-hub-conf 'max-fds))
-            (install-hub-rewrite-host (conf-get aw-hub-conf 'install-hub-rewrite-host))
-            (stat (aw_stat_returning_a_static_struct pstr)))
-        (if (cffi:null-pointer-p stat)
-          (error "log dir doesn't exist"))
-        (if (zerop (aw_stat_is_dir stat))
-          (error "log dir must be a directory"))
-        (if (or (not (integerp hub-uid)) (zerop hub-uid))
-          (error "hub can't run as root"))
-        (unless (= hub-uid (aw_stat_get_uid stat))
-          (error "hub directory isn't owned by hub user"))
-        (unless (= hub-uid (aw_stat_get_gid stat))
-          (error "hub directory in different group from hub"))
+    (let ((hub-uid (aw-lookup-user-name-with-getpwnam (conf-get aw-hub-conf 'hub-uid)))
+          (logger-uid (aw-lookup-user-name-with-getpwnam (conf-get aw-hub-conf 'logger-uid)))
+          (max-fds (conf-get aw-hub-conf 'max-fds))
+          (install-hub-rewrite-host (conf-get aw-hub-conf 'install-hub-rewrite-host)))
 
-        (aw-chmod (format nil "~a/aw_log" aw-hub-dir) #b111000000)
+      (if (or (not (integerp hub-uid)) (zerop hub-uid))
+        (error "hub can't run as root"))
+      (if (or (not (integerp logger-uid)) (zerop logger-uid))
+        (error "logger can't run as root"))
+      (if (equal hub-uid logger-uid)
+        (error "hub and logger processes must run under different users"))
 
+      (cffi:with-foreign-string (pstr (format nil "~a/aw_log" aw-hub-dir))
+        (let ((stat (aw_stat_returning_a_static_struct pstr)))
+          (if (cffi:null-pointer-p stat)
+            (error "aw_log dir doesn't exist"))
+          (if (zerop (aw_stat_is_dir stat))
+            (error "aw_log dir must be a directory"))
+          (unless (= logger-uid (aw_stat_get_uid stat))
+            (error "aw_log directory isn't owned by logger-uid (~a)" logger-uid))
+          (unless (= logger-uid (aw_stat_get_gid stat))
+            (error "aw_log directory in different group from logger-uid (~a)" logger-uid))))
+
+      (cffi:with-foreign-string (pstr (format nil "~a/empty" aw-hub-dir))
+        (let ((stat (aw_stat_returning_a_static_struct pstr)))
+          (if (cffi:null-pointer-p stat)
+            (error "empty dir doesn't exist"))
+          (if (zerop (aw_stat_is_dir stat))
+            (error "empty dir must be a directory"))
+          (if (= hub-uid (aw_stat_get_uid stat))
+            (error "empty directory is owned by hub-uid (~a)" hub-uid))
+          (if (= logger-uid (aw_stat_get_gid stat))
+            (error "empty directory in same group as hub-uid (~a)" hub-uid))))
+
+      (aw-chmod (format nil "~a/aw_log" aw-hub-dir) #b111000000)
+      (aw-chmod (format nil "~a/empty" aw-hub-dir) #b111101101)
+
+      (if max-fds
+        (aw_set_nofile max-fds))
+      (if install-hub-rewrite-host
+        (install-hub-rewrite-host install-hub-rewrite-host))
+      (unless nodaemon (aw-daemonise-drop-terminal))
+      (aw_chroot pstr)
+      (aw_dropto_uid_gid hub-uid)
+      (aw_set_nproc 1)))
+
+  ;; Unprivileged
+  (aw-log () "hub started")
+  (handler-bind ((error (lambda (condition)
+                          (fatal "run-hub: running: ~a" condition))))
+    (format t "Hub started. Entering event-loop...~%")
+    (event-loop)))
+
+
+
+(defun run-logger ()
+)
+
+
+
+
+#|
         (cffi:with-foreign-string (fstr (format nil "~a/aw_log/axslog" aw-hub-dir))
           (setq stat (aw_lstat_returning_a_static_struct fstr)) ; clobbering stat
           (unless (cffi:null-pointer-p stat)
@@ -1385,36 +1429,7 @@
               (error "aw_log/axslog not owned by hub user"))
             (unless (= hub-uid (aw_stat_get_gid stat))
               (error "aw_log/axslog in different group from hub"))))
-
-        (cffi:with-foreign-string (fstr (format nil "~a/aw_log/syslog" aw-hub-dir))
-          (setq stat (aw_lstat_returning_a_static_struct fstr)) ; clobbering stat
-          (unless (cffi:null-pointer-p stat)
-            (unless (zerop (aw_stat_is_sym_link stat))
-              (error "aw_log/syslog can't be a symlink"))
-            (if (zerop (aw_stat_is_reg_file stat))
-              (error "aw_log/syslog must be a file"))
-            (unless (= hub-uid (aw_stat_get_uid stat))
-              (error "aw_log/syslog not owned by hub user"))
-            (unless (= hub-uid (aw_stat_get_gid stat))
-              (error "aw_log/syslog in different group from hub"))))
-
-        (if max-fds
-          (aw_set_nofile max-fds))
-        (if install-hub-rewrite-host
-          (install-hub-rewrite-host install-hub-rewrite-host))
-        (unless nodaemon (aw-daemonise-drop-terminal))
-        (aw_chroot pstr)
-        (aw_dropto_uid_gid hub-uid)
-        (aw_set_nproc 1))))
-
-  ;; Unprivileged
-  (reopen-log-files)
-  (aw-log () "hub started")
-  (handler-bind ((error (lambda (condition)
-                          (fatal "run-hub: running: ~a" condition))))
-    (format t "Hub started. Entering event-loop...~%")
-    (event-loop)))
-
+|#
 
 (defun install-worker-conf ()
   (let ((tp-cache (conf-get aw-worker-conf 'cache)))

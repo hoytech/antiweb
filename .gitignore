@@ -3,5 +3,6 @@
 *.fasl
 *.lib
 *.fas
+*.lx64fsl
 bin/
 src/libantiweb-h.lisp

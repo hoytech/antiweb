@@ -86,7 +86,90 @@ struct kevent events[AW_EVENT_BATCH_SIZE];
 
 static void do_vectored_write_to_sd(struct conn *c);
 static void make_socket_blocking(int sd);
-static void aw_logf(char *file, char *prefix, char *fmt, ...);
+
+
+
+void aw_log(char *file, char *prefix, char *log_msg) {
+  struct ioblock *b;
+  int len, plen, mlen;
+
+  if (logger_conn == NULL) _exit(-1);
+
+  plen = strlen(prefix);
+  mlen = strlen(log_msg);
+
+  if (plen < 0 || plen > 50) _exit(-1);
+  if (mlen < 0 || mlen > AW_MAX_MSG_LENGTH) _exit(-1);
+
+  prealloc_ioblock();
+  b = free_ioblocks;
+  free_ioblocks = free_ioblocks->next;
+  b->next = NULL;
+
+  len = snprintf(b->data, AW_IOBLOCK_SIZE-1, "log %s %d\n%s", file, mlen+plen, prefix);
+  if (len == -1 || len >= AW_IOBLOCK_SIZE-1) _exit(-1);
+
+  b->offset = 0;
+
+  if (mlen <= AW_IOBLOCK_SIZE-len) {
+    memcpy(b->data + len, log_msg, mlen);
+    b->len = len + mlen;
+    log_msg += mlen;
+    mlen = 0;
+  } else {
+    memcpy(b->data + len, log_msg, AW_IOBLOCK_SIZE-len);
+    b->len = AW_IOBLOCK_SIZE;
+    log_msg += AW_IOBLOCK_SIZE-len;
+    mlen -= AW_IOBLOCK_SIZE-len;
+  }
+
+  if (logger_conn->out == NULL) {
+    logger_conn->out = logger_conn->outp = b;
+  } else {
+    logger_conn->outp->next = b;
+    logger_conn->outp = b;
+  }
+  logger_conn->outlen += b->len;
+
+  while (*log_msg) {
+    int amt;
+
+    if (mlen > AW_IOBLOCK_SIZE) amt = AW_IOBLOCK_SIZE;
+    else amt = mlen;
+
+    prealloc_ioblock();
+    b = free_ioblocks;
+    free_ioblocks = free_ioblocks->next;
+    b->next = NULL;
+
+    b->offset = 0;
+    b->len = amt;
+    memcpy(b->data, log_msg, amt);
+
+    log_msg += amt;
+    mlen -= amt;
+
+    logger_conn->outp->next = b;
+    logger_conn->outp = b;
+
+    logger_conn->outlen += amt;
+  }
+
+  aw_event_update(logger_conn);
+}
+
+
+static void aw_logf(char *file, char *prefix, char *fmt, ...) {
+  va_list ap;
+  char buf[2048];
+
+  va_start(ap, fmt);
+  vsnprintf(buf, sizeof(buf), fmt, ap);
+  va_end(ap);
+
+  aw_log(file, prefix, buf);
+}
+
 
 
 static void fatal(const char *fmt, ...) {
@@ -1943,11 +2026,14 @@ struct conn *aw_get_event() {
     next_timeout_ptr = next_timeout_ptr->next;
   }
 
+/*
+QQQ
   if (axslog_file_needs_fflushing) {
     if (fflush(axslog_file))
       fatal("aw_get_event: fflush: %s", strerror(errno));
     axslog_file_needs_fflushing = 0;
   }
+*/
 
   again:
 
@@ -2410,6 +2496,7 @@ void aw_daemonise_drop_terminal() {
 }
 
 /*
+QQQ
 void aw_hub_reopen_log_files() {
   // Note: On error we just exit because we have already daemonised and there is nowhere to log!
   if (syslog_file)
@@ -2453,89 +2540,6 @@ void aw_hub_write_axslog_msg(char *worker, char *log_msg) {
 }
 
 */
-
-
-
-void aw_log(char *file, char *prefix, char *log_msg) {
-  struct ioblock *b;
-  int len, plen, mlen;
-
-  if (logger_conn == NULL) _exit(-1);
-
-  plen = strlen(prefix);
-  mlen = strlen(log_msg);
-
-  if (plen < 0 || plen > 50) _exit(-1);
-  if (mlen < 0 || mlen > AW_MAX_MSG_LENGTH) _exit(-1);
-
-  prealloc_ioblock();
-  b = free_ioblocks;
-  free_ioblocks = free_ioblocks->next;
-  b->next = NULL;
-
-  len = snprintf(b->data, AW_IOBLOCK_SIZE-1, "log %s %d\n%s", file, mlen+plen, prefix);
-  if (len == -1 || len >= AW_IOBLOCK_SIZE-1) _exit(-1);
-
-  b->offset = 0;
-
-  if (mlen <= AW_IOBLOCK_SIZE-len) {
-    memcpy(b->data + len, log_msg, mlen);
-    b->len = len + mlen;
-    log_msg += mlen;
-    mlen = 0;
-  } else {
-    memcpy(b->data + len, log_msg, AW_IOBLOCK_SIZE-len);
-    b->len = AW_IOBLOCK_SIZE;
-    log_msg += AW_IOBLOCK_SIZE-len;
-    mlen -= AW_IOBLOCK_SIZE-len;
-  }
-
-  if (logger_conn->out == NULL) {
-    logger_conn->out = logger_conn->outp = b;
-  } else {
-    logger_conn->outp->next = b;
-    logger_conn->outp = b;
-  }
-  logger_conn->outlen += b->len;
-
-  while (*log_msg) {
-    int amt;
-
-    if (mlen > AW_IOBLOCK_SIZE) amt = AW_IOBLOCK_SIZE;
-    else amt = mlen;
-
-    prealloc_ioblock();
-    b = free_ioblocks;
-    free_ioblocks = free_ioblocks->next;
-    b->next = NULL;
-
-    b->offset = 0;
-    b->len = amt;
-    memcpy(b->data, log_msg, amt);
-
-    log_msg += amt;
-    mlen -= amt;
-
-    logger_conn->outp->next = b;
-    logger_conn->outp = b;
-
-    logger_conn->outlen += amt;
-  }
-
-  aw_event_update(logger_conn);
-}
-
-
-static void aw_logf(char *file, char *prefix, char *fmt, ...) {
-  va_list ap;
-  char buf[2048];
-
-  va_start(ap, fmt);
-  vsnprintf(buf, sizeof(buf), fmt, ap);
-  va_end(ap);
-
-  aw_log(file, prefix, buf);
-}
 
 
 

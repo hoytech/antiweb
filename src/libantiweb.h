@@ -117,7 +117,6 @@ int aw_stat_get_gid(struct stat *stat);
 void aw_chmod(char *path, int mode);
 void aw_send_dir_listings(struct conn *c, char *dirpath);
 struct conn *aw_build_cgi_conn(struct conn *c, char *path, char *pathinfo, char *urlargs, char *method, char *cookie, char *content_type, off_t postlen, off_t bufsize, off_t buftrig, int single_process_cgis_only, int maxfiles, int naked);
-void aw_hub_reopen_log_files();
 void aw_log(char *file, char *prefix, char *log_msg);
 void aw_mkdir_dash_p(char *path); // see source code
 void aw_gzip_file(char *src, char *dst);

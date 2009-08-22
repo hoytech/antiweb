@@ -7,6 +7,14 @@
      (declare (ignorable ,name))
      (setq ,name (lambda () ,@body))))
 
+
+(defmacro! aw-log ((&key (log-file "syslog") (prefix "")) fmt &rest args)
+  `(cffi:with-foreign-string (,g!fstr-log-file ,log-file)
+     (cffi:with-foreign-string (,g!fstr-prefix ,prefix)
+       (cffi:with-foreign-string (,g!fstr-msg (format nil ,fmt ,@args))
+         (aw_log ,g!fstr-log-file ,g!fstr-prefix ,g!fstr-msg)))))
+
+
 (defun fatal (fmt &rest args)
   (cffi:with-foreign-string (fstr (apply #'format nil fmt args))
     (aw_fatal fstr)))
@@ -84,11 +92,6 @@
 
 
 
-(defun aw-log ((&key (log-file "syslog") (prefix "")) fmt &rest args)
-  (cffi:with-foreign-string (fstr-log-file log-file)
-    (cffi:with-foreign-string (fstr-prefix prefix)
-      (cffi:with-foreign-string (fstr-msg (apply #'format nil fmt args))
-        (aw_log fstr-log-file fstr-log-file fstr-prefix fstr-msg)))))
 
 
 
@@ -169,11 +172,14 @@
   (cffi:with-foreign-string (fstr path)
     (aw_mkdir_dash_p fstr)))
 
+#|
+QQQ
 (defun reopen-log-files ()
   (aw_hub_reopen_log_files)
   (aw-chmod "/axslog" #b110000000)
   (aw-chmod "/syslog" #b110000000)
   t)
+|#
 
 (defun aw-daemonise-drop-terminal ()
   #+cmu (progn (close *terminal-io*)
@@ -666,6 +672,9 @@
     (if done 'ok 'listener-not-found)))
 
 
+(defun hub-start-logger-process (aw-hub-dir logger-uid)
+)
+
 
 (declaim (notinline hub-rewrite-host))
 
@@ -829,8 +838,8 @@
                   hub-unix-handler)
                 (when-match (#~m/^log ([\w-_.]+) (\d+)\n$/ shared-input-buffer)
                   (read-fixed-length-message-from-conn-and-store-in-shared-input-buffer (parse-integer $2)
-                    (let ((worker-name (worker (symbol-name
-                                                 (gethash (cffi:pointer-address c) worker-conn-table)))))
+                    (let ((worker-name (symbol-name
+                                         (gethash (cffi:pointer-address c) worker-conn-table))))
                       (aw-log (:log-file $1 :prefix worker-name) "~a" shared-input-buffer))
                     hub-unix-handler))))
             (when (not (gethash (cffi:pointer-address c) worker-conn-table)) ;; cmds NOT available to workers
@@ -863,6 +872,7 @@
   (let ((c (cffi:with-foreign-string (fstr (format nil "~a/hub.socket" aw-hub-dir))
              (aw_conn_unix fstr))))
     (setf hub_conn c)
+    (setf logger_conn c)
     (write-to-conn-from-string c
       (format nil "~aworker ~a~%~{register-host ~a~%~}lock~%" 
         (if checking "check-" "")
@@ -1393,12 +1403,15 @@
       (aw-chmod (format nil "~a/aw_log" aw-hub-dir) #b111000000)
       (aw-chmod (format nil "~a/empty" aw-hub-dir) #b111101101)
 
+      (hub-start-logger-process aw-hub-dir logger-uid)
+
       (if max-fds
         (aw_set_nofile max-fds))
       (if install-hub-rewrite-host
         (install-hub-rewrite-host install-hub-rewrite-host))
       (unless nodaemon (aw-daemonise-drop-terminal))
-      (aw_chroot pstr)
+      (cffi:with-foreign-string (pstr (format nil "~a/empty" aw-hub-dir))
+        (aw_chroot pstr))
       (aw_dropto_uid_gid hub-uid)
       (aw_set_nproc 1)))
 
@@ -1408,11 +1421,6 @@
                           (fatal "run-hub: running: ~a" condition))))
     (format t "Hub started. Entering event-loop...~%")
     (event-loop)))
-
-
-
-(defun run-logger ()
-)
 
 
 

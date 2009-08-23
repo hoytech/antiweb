@@ -1,3 +1,15 @@
+4.0BETA15
+
+* Change: Logging is now done by a separate logger process
+  which is connected to the hub. This is so that the hub process
+  never has to do blocking disk I/O. Furthermore, a compromised
+  hub process can no longer access previously created log files
+  because it is now chroot()ed to an empty directory.
+* Change: git is now used for version control, not CVS.
+* Bugfix: Uses volatile sig_atomic_t for variables set inside
+  signal handlers (currently just time_for_a_reaping).
+
+
 4.0BETA14   Jun 14, 2009
 
 * Bugfix: Sometimes a "Connection: close" header wouldn't be

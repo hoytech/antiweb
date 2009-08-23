@@ -76,6 +76,9 @@ struct conn {
 
 
 void aw_fatal(char *reason);
+void *aw_open_log_file(char *filename);
+void aw_close_log_file(void *v_fp);
+void aw_write_log_message(void *v_fp, char *msg);
 struct conn *aw_listen_unix(char *path);
 struct conn *aw_start_timer(int seconds);
 struct conn *aw_conn_unix(char *path);

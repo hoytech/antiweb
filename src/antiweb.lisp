@@ -172,15 +172,6 @@
   (cffi:with-foreign-string (fstr path)
     (aw_mkdir_dash_p fstr)))
 
-#|
-QQQ
-(defun reopen-log-files ()
-  (aw_hub_reopen_log_files)
-  (aw-chmod "/axslog" #b110000000)
-  (aw-chmod "/syslog" #b110000000)
-  t)
-|#
-
 (defun aw-daemonise-drop-terminal ()
   #+cmu (progn (close *terminal-io*)
                (setf *terminal-io* (open "/dev/null" :direction :io :if-exists :supersede)))
@@ -875,6 +866,42 @@ QQQ
 
 
 
+(defvar aw-open-log-files (make-hash-table :test 'equal))
+
+(defun reopen-log-files ()
+  (if (and (not (cffi:null-pointer-p hub_conn))
+           (not (cffi:null-pointer-p logger_conn)))
+    (error "reopen-log-files: worker can't reopen log files"))
+  (if (not (cffi:null-pointer-p logger_conn)) ; hub
+    (write-to-conn-from-string logger_conn
+      (format nil "reopen-log-files~%"))
+    (progn ; logger
+      (loop for v being the hash-values in aw-open-log-files do
+        (aw_close_log_file v))
+      (setf aw-open-log-files (make-hash-table :test 'equal)))))
+
+(defun get-log-file (logfile)
+  (let ((f (gethash logfile aw-open-log-files)))
+    (if f
+      (return-from get-log-file f))
+    (cffi:with-foreign-string (fstr (format nil "/~a" logfile))
+      (setf f (aw_open_log_file fstr))
+      (let ((stat (aw_lstat_returning_a_static_struct fstr))
+            (logger-uid (aw-lookup-user-name-with-getpwnam (conf-get aw-hub-conf 'logger-uid))))
+        (unless (cffi:null-pointer-p stat)
+          (unless (zerop (aw_stat_is_sym_link stat))
+            (fatal "~a/aw_log/~a can't be a symlink" aw-hub-dir logfile))
+          (if (zerop (aw_stat_is_reg_file stat))
+            (fatal "~a/aw_log/~a must be a file" aw-hub-dir logfile))
+          (unless (= logger-uid (aw_stat_get_uid stat))
+            (fatal "~a/aw_log/~a not owned by hub user" aw-hub-dir logfile))
+          (unless (= logger-uid (aw_stat_get_gid stat))
+            (fatal "~a/aw_log/~a in different group from hub" aw-hub-dir logfile))))
+      (setf (gethash logfile aw-open-log-files) f)
+      (aw-chmod logfile #b110000000)
+      f)))
+
+
 (defun logger-setup-hub-conn ()
   (let ((c (cffi:with-foreign-string (fstr (format nil "~a/hub.socket" aw-hub-dir))
              (aw_conn_unix fstr))))
@@ -887,10 +914,13 @@ QQQ
           (read-from-conn-into-string c shared-input-buffer ready)
           (aw_drop_n_input_bytes c ready)
           (or
+            (when-match (#~m/^reopen-log-files\n$/ shared-input-buffer)
+              (reopen-log-files)
+              logger-main)
             (when-match (#~m/^log ([\w-_.]+) (\d+)\n$/ shared-input-buffer)
               (read-fixed-length-message-from-conn-and-store-in-shared-input-buffer (parse-integer $2)
-                ;(aw-log (:log-file $1 :prefix worker-name) "~a" shared-input-buffer)
-                (format t "LOGGER: write to ~a: ~a~%" $1 shared-input-buffer)
+                (cffi:with-foreign-string (fstr shared-input-buffer)
+                  (aw_write_log_message (get-log-file $1) fstr))
                 logger-main))
             (fatal "bad message from hub")))))))
 
@@ -1481,20 +1511,6 @@ QQQ
     (event-loop)))
 
 
-#|
-QQQ
-        (cffi:with-foreign-string (fstr (format nil "~a/aw_log/axslog" aw-hub-dir))
-          (setq stat (aw_lstat_returning_a_static_struct fstr)) ; clobbering stat
-          (unless (cffi:null-pointer-p stat)
-            (unless (zerop (aw_stat_is_sym_link stat))
-              (error "aw_log/axslog can't be a symlink"))
-            (if (zerop (aw_stat_is_reg_file stat))
-              (error "aw_log/axslog must be a file"))
-            (unless (= hub-uid (aw_stat_get_uid stat))
-              (error "aw_log/axslog not owned by hub user"))
-            (unless (= hub-uid (aw_stat_get_gid stat))
-              (error "aw_log/axslog in different group from hub"))))
-|#
 
 (defun install-worker-conf ()
   (let ((tp-cache (conf-get aw-worker-conf 'cache)))

@@ -2026,15 +2026,6 @@ struct conn *aw_get_event() {
     next_timeout_ptr = next_timeout_ptr->next;
   }
 
-/*
-QQQ
-  if (axslog_file_needs_fflushing) {
-    if (fflush(axslog_file))
-      fatal("aw_get_event: fflush: %s", strerror(errno));
-    axslog_file_needs_fflushing = 0;
-  }
-*/
-
   again:
 
   while (time_for_a_reaping) {
@@ -2495,51 +2486,33 @@ void aw_daemonise_drop_terminal() {
     fatal("aw_daemonise: chdir: %s", strerror(errno));
 }
 
-/*
-QQQ
-void aw_hub_reopen_log_files() {
-  // Note: On error we just exit because we have already daemonised and there is nowhere to log!
-  if (syslog_file)
-    if (fclose(syslog_file)) _exit(-1);
-  if (axslog_file)
-    if (fclose(axslog_file)) _exit(-1);
-
-  syslog_file = axslog_file = NULL;
-
-  // The hub is always chroot()ed to the log directory
-  syslog_file = fopen("/syslog", "a");
-  if (syslog_file == NULL) _exit(-1);
-
-  axslog_file = fopen("/axslog", "a");
-  if (axslog_file == NULL) _exit(-1);
+void *aw_open_log_file(char *filename) {
+  FILE *fp = fopen(filename, "a");
+  if (fp == NULL) _exit(-1);
+  return (void *) fp;
 }
 
-static void hub_write_log_msg(FILE *fp, char *worker, char *log_msg) {
-  int i,len;
+void aw_close_log_file(void *v_fp) {
+  if (fclose((FILE *) v_fp)) _exit(-1);
+}
+
+void aw_write_log_message(void *v_fp, char *msg) {
+  size_t i,len;
+  FILE *fp = (FILE *) v_fp;
 
   if (fp == NULL) _exit(-1);
 
-  len = strlen(log_msg);
+  len = strlen(msg);
 
   for(i=0; i<len; i++)
-    if ((log_msg[i] & 0xff) < 32 || (log_msg[i] & 0xff) > 127) log_msg[i] = '?';
+    if ((msg[i] & 0xff) < 32 || (msg[i] & 0xff) > 127) msg[i] = '?';
 
-  if (fprintf(fp, "%s %ld %s\n", worker, (long) recentish_time, log_msg) == -1)
+  if (fprintf(fp, "%ld %s\n", (long) recentish_time, msg) == -1)
     _exit(-1);
+
+  fflush(fp);
 }
 
-void aw_hub_write_syslog_msg(char *worker, char *log_msg) {
-  hub_write_log_msg(syslog_file, worker, log_msg);
-  if (fflush(syslog_file))
-    fatal("aw_hub_write_syslog_msg: fflush: %s", strerror(errno));
-}
-
-void aw_hub_write_axslog_msg(char *worker, char *log_msg) {
-  hub_write_log_msg(axslog_file, worker, log_msg);
-  axslog_file_needs_fflushing = 1;
-}
-
-*/
 
 
 

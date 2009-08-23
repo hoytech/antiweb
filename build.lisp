@@ -27,7 +27,7 @@
 
 ;;;;;;;;;;;;;;; END OF ANTIWEB BUILD OPTIONS ;;;;;;;;;;;;;;;;;
 
-(defvar aw-warning-cflags "-Wall -Wpointer-arith")
+(defvar aw-warning-cflags "-Wall -Wformat=2 -Wpointer-arith")
 
 (format t "************* Antiweb Build Script *************~%")
 
@@ -173,7 +173,7 @@ int main() {
 
 
 (format t "BUILD: Compiling libantiweb~a.so~%" aw-bits)
-(system (format nil "gcc ~a ~a -Wformat=2 -fPIC -s -O3 -D_FORTIFY_SOURCE=2 -D_FILE_OFFSET_BITS=64 -D~a_ENDIAN ~a-DUSE_~a src/libantiweb.c bundled/sha1.c -lz ~a-shared -o bin/libantiweb~a.so"
+(system (format nil "gcc ~a ~a -fPIC -s -O3 -D_FORTIFY_SOURCE=2 -D_FILE_OFFSET_BITS=64 -D~a_ENDIAN ~a-DUSE_~a src/libantiweb.c bundled/sha1.c -lz ~a-shared -o bin/libantiweb~a.so"
                     aw-extra-cflags
                     aw-warning-cflags
                     (if (eq aw-endian 'big) "BIG" "LITTLE")

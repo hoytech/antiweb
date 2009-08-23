@@ -672,8 +672,6 @@ QQQ
     (if done 'ok 'listener-not-found)))
 
 
-(defun hub-start-logger-process (aw-hub-dir logger-uid)
-)
 
 
 (declaim (notinline hub-rewrite-host))
@@ -840,11 +838,19 @@ QQQ
                   (read-fixed-length-message-from-conn-and-store-in-shared-input-buffer (parse-integer $2)
                     (let ((worker-name (symbol-name
                                          (gethash (cffi:pointer-address c) worker-conn-table))))
-                      (aw-log (:log-file $1 :prefix worker-name) "~a" shared-input-buffer))
+                      (aw-log (:log-file $1 :prefix (format nil "~a " worker-name)) "~a" shared-input-buffer))
                     hub-unix-handler))))
             (when (not (gethash (cffi:pointer-address c) worker-conn-table)) ;; cmds NOT available to workers
               (or
                 (handle-eval-returning-closure-or-nil-if-eval-msg-not-in-shared-input-buffer hub-unix-handler)
+                (when-match (#~m/^logger\n$/ shared-input-buffer)
+                  (unless (cffi:null-pointer-p logger_conn)
+                    (fatal "second logger process tried to connect"))
+                  (setf logger_conn c)
+                  (aw-log () "logger process connected to hub")
+                  (fsm logger-main
+                    (fatal "got a message from logger process")
+                    logger-main))
                 (when-match (#~m/^transfer ([\w-_.]+)\n$/ shared-input-buffer)
                   (let ((p (lookup-conn-pointer-from-worker-name (read-from-string $1))))
                     (if (null p)
@@ -866,6 +872,28 @@ QQQ
               (setf conntype AW_CONNTYPE_ZOMBIE)
               (aw_touch_conn c 0)
               'bad-cmd-from-connection-to-hub-socket))))))))
+
+
+
+(defun logger-setup-hub-conn ()
+  (let ((c (cffi:with-foreign-string (fstr (format nil "~a/hub.socket" aw-hub-dir))
+             (aw_conn_unix fstr))))
+    (setf hub_conn c)
+    (write-to-conn-from-string c
+      (format nil "logger~%"))
+    (add-to-conn-table c
+      (fsm logger-main
+        (cffi:with-foreign-slots ((ready limit sep conntype) c conn)
+          (read-from-conn-into-string c shared-input-buffer ready)
+          (aw_drop_n_input_bytes c ready)
+          (or
+            (when-match (#~m/^log ([\w-_.]+) (\d+)\n$/ shared-input-buffer)
+              (read-fixed-length-message-from-conn-and-store-in-shared-input-buffer (parse-integer $2)
+                ;(aw-log (:log-file $1 :prefix worker-name) "~a" shared-input-buffer)
+                (format t "LOGGER: write to ~a: ~a~%" $1 shared-input-buffer)
+                logger-main))
+            (fatal "bad message from hub")))))))
+
 
 
 (defun worker-unix-connect (checking)
@@ -1363,9 +1391,6 @@ QQQ
     (setf aw-hub-dir hub-dir)
     (let (*read-eval*)
       (setf aw-hub-conf (load-conf-from-file (format nil "~a/hub.conf" aw-hub-dir))))
-    (dolist (i (conf-get-all aw-hub-conf 'listen))
-      (hub-start-inet-listener (cadr i) (caddr i)))
-    (hub-start-unix-listener (format nil "~a/hub.socket" aw-hub-dir))
     (let ((hub-uid (aw-lookup-user-name-with-getpwnam (conf-get aw-hub-conf 'hub-uid)))
           (logger-uid (aw-lookup-user-name-with-getpwnam (conf-get aw-hub-conf 'logger-uid)))
           (max-fds (conf-get aw-hub-conf 'max-fds))
@@ -1373,6 +1398,56 @@ QQQ
 
       (if (or (not (integerp hub-uid)) (zerop hub-uid))
         (error "hub can't run as root"))
+      (if (equal hub-uid logger-uid)
+        (error "hub and logger processes must run under different users"))
+
+      (cffi:with-foreign-string (pstr (format nil "~a/empty" aw-hub-dir))
+        (let ((stat (aw_stat_returning_a_static_struct pstr)))
+          (if (cffi:null-pointer-p stat)
+            (error "empty dir doesn't exist"))
+          (if (zerop (aw_stat_is_dir stat))
+            (error "empty dir must be a directory"))
+          (if (= hub-uid (aw_stat_get_uid stat))
+            (error "empty directory is owned by hub-uid (~a)" hub-uid))
+          (if (= logger-uid (aw_stat_get_gid stat))
+            (error "empty directory in same group as hub-uid (~a)" hub-uid))))
+
+      (aw-chmod (format nil "~a/empty" aw-hub-dir) #b111101101)
+
+      (unless nodaemon (aw-daemonise-drop-terminal))
+
+      (dolist (i (conf-get-all aw-hub-conf 'listen))
+        (hub-start-inet-listener (cadr i) (caddr i)))
+      (hub-start-unix-listener (format nil "~a/hub.socket" aw-hub-dir))
+      (if max-fds
+        (aw_set_nofile max-fds))
+      (if install-hub-rewrite-host
+        (install-hub-rewrite-host install-hub-rewrite-host))
+      (cffi:with-foreign-string (pstr (format nil "~a/empty" aw-hub-dir))
+        (aw_chroot pstr))
+      (aw_dropto_uid_gid hub-uid)
+      (aw_set_nproc 1)))
+
+  ;; Unprivileged
+  (handler-bind ((error (lambda (condition)
+                          (fatal "run-hub: running: ~a" condition))))
+    (format t "Hub started. Entering event-loop...~%")
+    (event-loop)))
+
+
+
+
+(defun run-logger (hub-dir &optional nodaemon)
+  ;; Privileged
+  (do-aw-init (not nodaemon))
+  (handler-bind ((error (lambda (condition)
+                          (fatal "run-logger: startup: ~a" condition))))
+    (setf aw-hub-dir hub-dir)
+    (let (*read-eval*)
+      (setf aw-hub-conf (load-conf-from-file (format nil "~a/hub.conf" aw-hub-dir))))
+    (let ((logger-uid (aw-lookup-user-name-with-getpwnam (conf-get aw-hub-conf 'logger-uid)))
+          (hub-uid (aw-lookup-user-name-with-getpwnam (conf-get aw-hub-conf 'hub-uid))))
+
       (if (or (not (integerp logger-uid)) (zerop logger-uid))
         (error "logger can't run as root"))
       (if (equal hub-uid logger-uid)
@@ -1389,43 +1464,25 @@ QQQ
           (unless (= logger-uid (aw_stat_get_gid stat))
             (error "aw_log directory in different group from logger-uid (~a)" logger-uid))))
 
-      (cffi:with-foreign-string (pstr (format nil "~a/empty" aw-hub-dir))
-        (let ((stat (aw_stat_returning_a_static_struct pstr)))
-          (if (cffi:null-pointer-p stat)
-            (error "empty dir doesn't exist"))
-          (if (zerop (aw_stat_is_dir stat))
-            (error "empty dir must be a directory"))
-          (if (= hub-uid (aw_stat_get_uid stat))
-            (error "empty directory is owned by hub-uid (~a)" hub-uid))
-          (if (= logger-uid (aw_stat_get_gid stat))
-            (error "empty directory in same group as hub-uid (~a)" hub-uid))))
-
       (aw-chmod (format nil "~a/aw_log" aw-hub-dir) #b111000000)
-      (aw-chmod (format nil "~a/empty" aw-hub-dir) #b111101101)
 
-      (hub-start-logger-process aw-hub-dir logger-uid)
-
-      (if max-fds
-        (aw_set_nofile max-fds))
-      (if install-hub-rewrite-host
-        (install-hub-rewrite-host install-hub-rewrite-host))
       (unless nodaemon (aw-daemonise-drop-terminal))
-      (cffi:with-foreign-string (pstr (format nil "~a/empty" aw-hub-dir))
+
+      (logger-setup-hub-conn)
+      (cffi:with-foreign-string (pstr (format nil "~a/aw_log" aw-hub-dir))
         (aw_chroot pstr))
-      (aw_dropto_uid_gid hub-uid)
+      (aw_dropto_uid_gid logger-uid)
       (aw_set_nproc 1)))
 
   ;; Unprivileged
-  (aw-log () "hub started")
   (handler-bind ((error (lambda (condition)
-                          (fatal "run-hub: running: ~a" condition))))
-    (format t "Hub started. Entering event-loop...~%")
+                          (fatal "logger process: ~a" condition))))
+    (format t "Logger started. Entering event-loop...~%")
     (event-loop)))
 
 
-
-
 #|
+QQQ
         (cffi:with-foreign-string (fstr (format nil "~a/aw_log/axslog" aw-hub-dir))
           (setq stat (aw_lstat_returning_a_static_struct fstr)) ; clobbering stat
           (unless (cffi:null-pointer-p stat)

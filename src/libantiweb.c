@@ -180,13 +180,13 @@ static void fatal(const char *fmt, ...) {
   if (fatal_has_already_been_called) _exit(-1);
   fatal_has_already_been_called = 1;
 
-  fprintf(stderr, "FATAL: %s\n", buf);
-
-  if (logger_conn == NULL) _exit(-1);
-
   va_start(ap, fmt);
   vsnprintf(buf, sizeof(buf), fmt, ap);
   va_end(ap);
+
+  fprintf(stderr, "FATAL: %s\n", buf);
+
+  if (logger_conn == NULL) _exit(-1);
 
   len = strlen(buf);
 

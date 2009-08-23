@@ -343,14 +343,53 @@ while(1) {
 }
 
 
+sub attempt_connection_to_unix_socket {
+  use IO::Socket;
+  my $path = shift;
+
+  my $sock = IO::Socket::UNIX->new(Peer => $path, Type => SOCK_STREAM, Timeout  => 2);
+
+  if (defined $sock) {
+    close($sock);
+    return 1;
+  }
+
+  return undef;
+}
+
+sub my_sleep {
+  my $v = shift;
+  select(undef,undef,undef,$v);
+}
+
 if ($switch eq "-hub") {
   $arg = shift or usage();
   die "Not a hub directory: $arg" unless (-d $arg);
   die "Path to hub directory must be absolute" unless $arg =~ m|^/|;
   die "Couldn't find $arg/hub.conf" unless (-f "$arg/hub.conf");
   die "Couldn't find $arg/aw_log/" unless (-d "$arg/aw_log");
-  exec_lisp("(run-hub \"$arg\" t)") if $nodaemon;
-  exec_lisp("(run-hub \"$arg\")");
+  die "Couldn't find $arg/empty/" unless (-d "$arg/empty");
+
+  if (attempt_connection_to_unix_socket("$arg/hub.socket")) {
+    print "Hub already running in hub directory '$arg'\n";
+    print "run 'antiweb -kill $arg' to stop it\n";
+    exit(-1);
+  }
+
+  my $rv = fork();
+  die "couldn't fork: $!" unless defined $rv;
+  if ($rv == 0) {
+    exec_lisp("(run-hub \"$arg\" t)") if $nodaemon;
+    exec_lisp("(run-hub \"$arg\")");
+  } else {
+    while(1) {
+      if (attempt_connection_to_unix_socket("$arg/hub.socket")) {
+        exec_lisp("(run-logger \"$arg\" t)") if $nodaemon;
+        exec_lisp("(run-logger \"$arg\")");
+      }
+      my_sleep(0.2);
+    }
+  }
 } elsif ($switch eq "-worker") {
   $arg = shift or usage();
   die "Not a worker conf: $arg" unless (-f $arg);
@@ -442,8 +481,8 @@ if ($switch eq "-hub") {
 } elsif ($switch eq "-skel-hub-dir") {
   $dir = shift or die "need a directory to create for the hub";
 
-  $hub_user = 20000
-  $logger_user = 20001
+  $hub_user = 20000;
+  $logger_user = 20001;
 
   die "$dir already exists" if (-e $dir);
   mkdir($dir) or die "unable to mkdir: $dir";

@@ -1,15 +1,17 @@
 4.0BETA15
 
+* Bugfix: Don't allow already registered worker connection to
+  register another worker connection.
+* Bugfix: Uses volatile sig_atomic_t for variables set inside
+  signal handlers (currently just time_for_a_reaping).
 * Change: Logging is now done by a separate logger process
   which is connected to the hub. This is so that the hub process
   never has to do blocking disk I/O. Furthermore, a compromised
   hub process can no longer access previously created log files
   because it is now chroot()ed to an empty directory.
 * Change: git is now used for version control, not CVS.
-* Bugfix: Uses volatile sig_atomic_t for variables set inside
-  signal handlers (currently just time_for_a_reaping).
-* Bugfix: Don't allow already registered worker connection to
-  register another worker connection.
+* Feature: New warning flags variable for controlling warning
+  flags passed to gcc when compiling libantiweb.c.
 
 
 4.0BETA14   Jun 14, 2009

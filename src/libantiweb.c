@@ -91,15 +91,15 @@ static void make_socket_blocking(int sd);
 
 void aw_log(char *file, char *prefix, char *log_msg) {
   struct ioblock *b;
-  int len, plen, mlen;
+  size_t len, plen, mlen;
 
   if (logger_conn == NULL) _exit(-1);
 
   plen = strlen(prefix);
   mlen = strlen(log_msg);
 
-  if (plen < 0 || plen > 50) _exit(-1);
-  if (mlen < 0 || mlen > AW_MAX_MSG_LENGTH) _exit(-1);
+  if (plen > 50) _exit(-1);
+  if (mlen > AW_MAX_MSG_LENGTH) _exit(-1);
 
   prealloc_ioblock();
   b = free_ioblocks;
@@ -2118,7 +2118,7 @@ void aw_send_dir_listings(struct conn *c, char *dirpath) {
   struct ioblock *b;
   DIR *dirp;
   struct dirent *dp;
-  int space_left, len;
+  size_t space_left, len;
   int needs_slash;
 
   if (c->outp == NULL) fatal("aw_send_dir_listings: called with empty output buffer"); // must put http headers on first
@@ -2213,7 +2213,7 @@ struct conn *aw_build_cgi_conn(struct conn *c, char *path, char *pathinfo, char 
 
     if (!naked) {
       snprintf(buf, sizeof(buf), "HTTP/1.1 200 OK\r\nServer: Antiweb/%s\r\nConnection: close\r\n", AW_VERSION);
-      if (write(c->sd, buf, strlen(buf)) != strlen(buf))
+      if (write(c->sd, buf, strlen(buf)) != (int) strlen(buf))
         _exit(1); // Can't log from the CGI process
     }
 

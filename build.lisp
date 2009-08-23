@@ -27,7 +27,7 @@
 
 ;;;;;;;;;;;;;;; END OF ANTIWEB BUILD OPTIONS ;;;;;;;;;;;;;;;;;
 
-(defvar aw-warning-cflags "-Wall -Wpointer-arith -Wextra -Wno-unused-parameter")
+(defvar aw-warning-cflags "-Wall -Wpointer-arith")
 
 (format t "************* Antiweb Build Script *************~%")
 

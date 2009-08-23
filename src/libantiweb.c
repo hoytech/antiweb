@@ -106,7 +106,7 @@ void aw_log(char *file, char *prefix, char *log_msg) {
   free_ioblocks = free_ioblocks->next;
   b->next = NULL;
 
-  len = snprintf(b->data, AW_IOBLOCK_SIZE-1, "log %s %d\n%s", file, mlen+plen, prefix);
+  len = snprintf(b->data, AW_IOBLOCK_SIZE-1, "log %s %zd\n%s", file, mlen+plen, prefix);
   if (len == -1 || len >= AW_IOBLOCK_SIZE-1) _exit(-1);
 
   b->offset = 0;

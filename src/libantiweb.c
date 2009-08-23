@@ -64,7 +64,7 @@ time_t next_timeout_scan=0;
 int event_desc=-1;
 struct conn *artificial_ready_conns[AW_NUM_ARTIFICIAL_READY_CONNS];
 int num_artificial_ready_conns=0;
-int time_for_a_reaping=0;
+volatile sig_atomic_t time_for_a_reaping=0;
 int fatal_has_already_been_called=0;
 
 char *sep_single_newline = "\n";

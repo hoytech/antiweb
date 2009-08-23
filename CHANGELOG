@@ -8,6 +8,8 @@
 * Change: git is now used for version control, not CVS.
 * Bugfix: Uses volatile sig_atomic_t for variables set inside
   signal handlers (currently just time_for_a_reaping).
+* Bugfix: Don't allow already registered worker connection to
+  register another worker connection.
 
 
 4.0BETA14   Jun 14, 2009

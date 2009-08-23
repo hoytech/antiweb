@@ -786,18 +786,6 @@
           (read-from-conn-into-string c shared-input-buffer ready)
           (aw_drop_n_input_bytes c ready)
           (or
-            (when-match (#~m/^(check-|)worker ([\w._-]+)\n$/ shared-input-buffer) ;; no turning back for workers
-              (let ((worker-name (intern (string-upcase $2))))
-                (if (or (null worker-name) (eq worker-name 'hub) (lookup-conn-pointer-from-worker-name worker-name))
-                  (progn
-                    (if (zerop (length $1))
-                      (aw-log () "worker ~a already registered" $2))
-                    (setf conntype AW_CONNTYPE_ZOMBIE)
-                    (aw_touch_conn c 0)
-                    'worker-already-regged)
-                  (progn
-                    (setf (gethash (cffi:pointer-address c) worker-conn-table) (read-from-string $2))
-                    hub-unix-handler))))
             (when (gethash (cffi:pointer-address c) worker-conn-table) ;; worker cmds
               (or
                 (when-match (#~m/^lock\n$/ shared-input-buffer)
@@ -834,6 +822,22 @@
             (when (not (gethash (cffi:pointer-address c) worker-conn-table)) ;; cmds NOT available to workers
               (or
                 (handle-eval-returning-closure-or-nil-if-eval-msg-not-in-shared-input-buffer hub-unix-handler)
+
+                (when-match (#~m/^(check-|)worker ([\w._-]+)\n$/ shared-input-buffer) ;; no turning back for workers
+                  (let ((worker-name (intern (string-upcase $2))))
+                    (if (or (null worker-name)
+                            (eq worker-name 'hub)
+                            (eq worker-name 'logger)
+                            (lookup-conn-pointer-from-worker-name worker-name))
+                      (progn
+                        (if (zerop (length $1))
+                          (aw-log () "worker ~a already registered" $2))
+                        (setf conntype AW_CONNTYPE_ZOMBIE)
+                        (aw_touch_conn c 0)
+                        'worker-already-regged)
+                      (progn
+                        (setf (gethash (cffi:pointer-address c) worker-conn-table) (read-from-string $2))
+                        hub-unix-handler))))
                 (when-match (#~m/^logger\n$/ shared-input-buffer)
                   (unless (cffi:null-pointer-p logger_conn)
                     (fatal "second logger process tried to connect"))

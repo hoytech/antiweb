@@ -93,7 +93,10 @@ void aw_log(char *file, char *prefix, char *log_msg) {
   struct ioblock *b;
   size_t len, plen, mlen;
 
-  if (logger_conn == NULL) _exit(-1);
+  if (logger_conn == NULL) {
+    printf("%s%s\n", prefix, log_msg);
+    return;
+  }
 
   plen = strlen(prefix);
   mlen = strlen(log_msg);

@@ -374,25 +374,33 @@ if ($switch eq "-hub") {
   die "Couldn't find $arg/empty/" unless (-d "$arg/empty");
 
   if (attempt_connection_to_unix_socket("$arg/hub.socket")) {
-    print "Hub already running in hub directory '$arg'\n";
-    print "run 'antiweb -kill $arg' to stop it\n";
+    print STDERR "Hub already running in hub directory '$arg'\n";
+    print STDERR "run 'antiweb -kill $arg' to stop it\n";
     exit(-1);
   }
 
-  my $rv = fork();
-  die "couldn't fork: $!" unless defined $rv;
-  if ($rv == 0) {
-    exec_lisp("(run-hub \"$arg\" t)") if $nodaemon;
-    exec_lisp("(run-hub \"$arg\")");
-  } else {
-    while(1) {
+  my $relaunch_attempts = 5;
+  my $relaunch_delay = 0.1;
+
+  for (; $relaunch_attempts>=0; $relaunch_attempts--) {
+    my $rv = fork();
+    die "couldn't fork: $!" unless defined $rv;
+    if ($rv == 0) {
+      exec_lisp("(run-hub \"$arg\" t)") if $nodaemon;
+      exec_lisp("(run-hub \"$arg\")");
+    } else {
+      my_sleep($relaunch_delay);
       if (attempt_connection_to_unix_socket("$arg/hub.socket")) {
         exec_lisp("(run-logger \"$arg\" t)") if $nodaemon;
         exec_lisp("(run-logger \"$arg\")");
       }
-      my_sleep(0.2);
+      print STDERR "LOGGER: Unable to connect to hub. Retrying $relaunch_attempts more times...\n" if $relaunch_attempts;
+      $relaunch_delay *= 2;
     }
   }
+
+  print STDERR "LOGGER: Gave up trying to connect to hub.\n";
+  exit(-1);
 } elsif ($switch eq "-worker") {
   $arg = shift or usage();
   die "Not a worker conf: $arg" unless (-f $arg);

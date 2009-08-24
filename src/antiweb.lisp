@@ -1448,8 +1448,6 @@
 
       (aw-chmod (format nil "~a/empty" aw-hub-dir) #b111101101)
 
-      (unless nodaemon (aw-daemonise-drop-terminal))
-
       (dolist (i (conf-get-all aw-hub-conf 'listen))
         (hub-start-inet-listener (cadr i) (caddr i)))
       (hub-start-unix-listener (format nil "~a/hub.socket" aw-hub-dir))
@@ -1457,6 +1455,9 @@
         (aw_set_nofile max-fds))
       (if install-hub-rewrite-host
         (install-hub-rewrite-host install-hub-rewrite-host))
+
+      (unless nodaemon (aw-daemonise-drop-terminal))
+
       (cffi:with-foreign-string (pstr (format nil "~a/empty" aw-hub-dir))
         (aw_chroot pstr))
       (aw_dropto_uid_gid hub-uid)

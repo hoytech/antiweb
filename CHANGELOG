@@ -4,6 +4,8 @@
   register another worker connection.
 * Bugfix: Uses volatile sig_atomic_t for variables set inside
   signal handlers (currently just time_for_a_reaping).
+* Bugfix: Improved confusing log message when a worker requires a
+  worker cache but none is present.
 * Change: Logging is now done by a separate logger process
   which is connected to the hub. This is so that the hub process
   never has to do blocking disk I/O. Furthermore, a compromised

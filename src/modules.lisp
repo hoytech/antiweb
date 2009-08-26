@@ -82,7 +82,7 @@ body,h1 { margin:10px; font-family: Verdana, Arial, sans-serif; }
                ("Content-Length" "0"))
              (return-this-closure keepalive-closure))
            (let ((awp-file-path ,(http-root-translate handler 'http-path))
-                 (cache-path (format nil "~a/~a~a" aw-worker-cache ,(car (xconf-get handler :hosts)) http-path)))
+                 (cache-path (format nil "~a/~a~a" (get-aw-worker-cache-or-error) ,(car (xconf-get handler :hosts)) http-path)))
              (let ((awp-compile-result (awp-compile-error-wrapper awp-file-path (aw_stat_get_mtime stat) cache-path)))
                (when (stringp awp-compile-result)
                  (aw-log () "failed .awp request: (~a) ~a" awp-file-path awp-compile-result)
@@ -193,7 +193,7 @@ body,h1 { margin:10px; font-family: Verdana, Arial, sans-serif; }
              (ignore-errors ; invalid javascript file (ie unclosed comment), clients will be sent original
                (let* ((orig-mtime (aw_stat_get_mtime stat))
                       (cache-path (format nil "~a/~a~a.min.js"
-                                          aw-worker-cache
+                                          (get-aw-worker-cache-or-error)
                                           ,(car (xconf-get handler :hosts))
                                           http-path))
                       (stat (cffi:with-foreign-string (pstr cache-path)
@@ -220,7 +220,7 @@ body,h1 { margin:10px; font-family: Verdana, Arial, sans-serif; }
              (ignore-errors ; invalid javascript file (ie unclosed comment), clients will be sent original
                (let* ((orig-mtime (aw_stat_get_mtime stat))
                       (cache-path (format nil "~a/~a~a.min.css"
-                                          aw-worker-cache
+                                          (get-aw-worker-cache-or-error)
                                           ,(car (xconf-get handler :hosts))
                                           http-path))
                       (stat (cffi:with-foreign-string (pstr cache-path)
@@ -313,7 +313,7 @@ body,h1 { margin:10px; font-family: Verdana, Arial, sans-serif; }
                  (let* ((orig-mtime (aw_stat_get_mtime stat))
                         (cache-path (if $u-awp-real-path
                                       (format nil "~a.gz" $u-awp-real-path)
-                                      (format nil "~a/~a~a.gz" aw-worker-cache
+                                      (format nil "~a/~a~a.gz" (get-aw-worker-cache-or-error)
                                                                ,(car (xconf-get handler :hosts))
                                                                http-path))))
                    (cffi:with-foreign-string (pstr cache-path)

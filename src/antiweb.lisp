@@ -1517,6 +1517,11 @@
 
 
 
+(defun get-aw-worker-cache-or-error ()
+  (if (and (boundp 'aw-worker-cache) aw-worker-cache)
+    aw-worker-cache
+    (error "worker requires antiweb cache directory")))
+
 (defun install-worker-conf ()
   (let ((tp-cache (conf-get aw-worker-conf 'cache)))
     (if tp-cache

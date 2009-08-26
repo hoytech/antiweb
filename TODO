@@ -6,9 +6,6 @@ try to crash AW by truncating a file while it is being sent (with and without mm
 ?? -ftrapv
 
 
-Got this log when I forgot to add a cache dir. make the error less confusing.
-PUBLIC 1229745356 WORKER FATAL: aw_stat_returning_a_static_struct: path must be absolute, not NIL/XYZ.com/sitemap.xml.gz
-
 
 AWP Tasks:
 

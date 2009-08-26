@@ -55,7 +55,6 @@ API:
 
 Opt:
 
-!! create separate logger process so hub is completely non-blocking
 !! doubly linked conn lists to remove the 1 remaining O(N) operation
 
 O_NOATIME on linux

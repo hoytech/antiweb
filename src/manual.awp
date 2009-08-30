@@ -180,7 +180,7 @@ Host -> HTML root mappings:
     #"Antiweb was designed with security in mind from the beginning. Here are some of the security decisions made during the Antiweb design process:"#
     (ul
       #"Virtual hosts are privilege-separated <b>without proxying</b>. Once the hub has determined which worker should handle a connection, it transfers the socket to the worker process and has nothing further to do with the connection. Worker processes run under different UIDs from the hub (and each-other). Workers are optionally #(link "worker.html#CHROOT" "chroot()ed")."#
-      #"Workers have no access to log files: all log messages are sent to the hub over the unix socket. This means that a compromised worker process cannot steal previously created log messages or log messages created by other workers."#
+      #"Workers have no access to log files: all log messages are sent to the hub over the unix socket. The hub then subsequently sends them to the logger process. This means that a compromised worker process cannot steal previously created log messages or log messages created by other workers, and a compromised hub process cannot steal previously created log messages."#
       #"#(link "design.html#CGI-PROCESSES" "CGI processes") can be restricted with resource limitations."#
       #"Even on lisps without unicode support, Antiweb4 guarantees all internal data and filenames are #(link "design.html#UNICODE" "UTF-8") encoded. This includes verifying all code-points are in their shortest possible representation and that there are no otherwise invalid surrogates."#
       #"Antiweb processes never try to clean-up or recover in the event of an unexpected condition. A process cannot do that because it has #(link "faq.html#ERLANG" "failed"). Some other process that hasn't failed will clean-up after it."#
@@ -220,17 +220,9 @@ conns and ioblocks:
     (processes "Processes"
       #"For performance and security, Antiweb is a group of unix processes. This section describes the roles and responsibilities of the different processes."#
 
-      #"Every valid HTTP connection touches at least two processes: the hub process and the worker that has been assigned to the virtual host requested. The following figure illustrates a running Antiweb system. The arrows represent #(link "http://www.openbsd.org/cgi-bin/man.cgi?query=unix" "unix") socket connections (AF_UNIX) between processes or a listening internet socket."#
-      (fieldset #"Antiweb4 Processes"# #"<img src="http://hoytech.com/antiweb/processes.png">"#)
+      #"The following figure illustrates the processes and responsibilities of a running Antiweb system."#
+      (fieldset #"Antiweb4 Processes"# #"<img src="http://hoytech.com/antiweb/processes2.png">"#)
       (sections
-        (supervisor-process "Supervisor Process"
-          (ul
-            #"Supervisor processes are only intended for interactive use, not as unattended, long running processes."#
-            #"A supervisor process never executes the eval message."#
-          )
-          #"Supervisor processes do not run during normal Antiweb operation. The user must (as root) manually start a supervisor process. #(tip "Although you must start a supervisor process as root, root privileges are dropped once you have attached. They are dropped to the same UID/GID as the process you are attaching to.") Typically, you will only run a supervisor process to #(link "faq.html#ATTACH" "attach") to other processes for diagnostics/development/etc."#
-          #"Supervisor processes are created for almost every Antiweb operation, including #(link "faq.html#STATS" "-stats") queries and #(link "faq.html#ADDING-LISTENERS" "adding or removing listeners"). When you attach to a worker process, the hub passes the supervisor process's unix socket to the worker over the same unix socket that HTTP connections are transferred over."#
-        )
         (hub-process "Hub Process"
           #"The hub process is usually the busiest process in the Antiweb system. Here are its duties:"#
           (ul
@@ -242,7 +234,14 @@ conns and ioblocks:
           #"Some other details about the hub:"#
           (ul
             #"Runs as its own UID specified in the hub conf file. The GID is always the same as the UID."#
-            #"chroot()ed to the log directory, of which it owns and has write permissions."#
+            #"chroot()ed to the empty directory, of which it owns no permissions."#
+          )
+        )
+        (logger-process "Logger process"
+          #"The logger process is connected to the hub process over a unix socket. Its only job is to accept log messages from the hub process and write them to disk. When a worker creates a log message, it is routed through the hub to the logger process."#
+          (ul
+            #"Runs as its own UID specified in the hub conf file. The GID is always the same as the UID."#
+            #"chroot()ed to the aw_log directory, of which it has write permission."#
             #"It will chmod() the log files so they are never world readable/writeable."#
             #"Log files cannot be symlinks."#
           )
@@ -257,6 +256,14 @@ conns and ioblocks:
           #"#(tip #"Why would you want to run multiple workers?<br>#(ul "Privilege separated vhosts" "SMP/multi-core" "Reduce disk latency")"#) On start-up, each worker process reads its conf file and compiles a function for dispatching HTTP requests given the mount points and other features present. After it starts, a worker process will never re-open this conf file. The only way to provide it a new conf file is by message passing using a supervisor process. This is necessary to allow you to chroot() a worker to a root not containing the conf file."#
           #"After registering the vhosts it is interested in with the hub, a worker process will "lock" the hub connection so it can't register additional vhosts. To later add vhosts, the connection must be manually unlocked by a supervisor process (this happens behind-the-scenes when you #(link "faq.html#RELOADING-WORKER-CONF" "-reload") a worker conf--see one possible but #(link "faq.html#RELOAD-ATTACK" "unlikely attack") related to this.). If you try to -reload with a bad worker conf, Antiweb will not install the new conf and will continue with the original conf. If you -reload a worker conf and it compiles fine but throws some error during processing an HTTP request, Antiweb will #(link "faq.html#ROLLBACKS" "rollback") to the previous conf."#
           (fieldset "Privilege Separation" (ul #"A compromised worker process cannot steal connections for vhosts that don't belong to it."# #"A compromised worker process cannot intercept log messages created by other workers."#))
+        )
+        (supervisor-process "Supervisor Process(es)"
+          (ul
+            #"Supervisor processes are only intended for interactive use, not as unattended, long running processes."#
+            #"A supervisor process never executes the eval message."#
+          )
+          #"Supervisor processes do not run during normal Antiweb operation. The user must (as root) manually start a supervisor process. #(tip "Although you must start a supervisor process as root, root privileges are dropped once you have attached. They are dropped to the same UID/GID as the process you are attaching to.") Typically, you will only run a supervisor process to #(link "faq.html#ATTACH" "attach") to other processes for diagnostics/development/etc."#
+          #"Supervisor processes are created for almost every Antiweb operation, including #(link "faq.html#STATS" "-stats") queries and #(link "faq.html#ADDING-LISTENERS" "adding or removing listeners"). When you attach to a worker process, the hub passes the supervisor process's unix socket to the worker over the same unix socket that HTTP connections are transferred over."#
         )
         (cgi-process "CGI Process(es)"
           #"#(tip "The limit on the length of POST content is defined in src/libantiweb.h as AW_MAX_POST_LEN")Antiweb is conditionally compliant with CGI/1.1. All useful environment variables are supported, as well as buffered POST content on standard input. PATH_INFO is supported and is implemented more efficiently than many other servers (including Antiweb3). Your CGI script may start receiving data before the entire POST content has been read by the worker. If the POST is terminated prematurely, the content may be cut short. Be sure to check you have read exactly $ENV{CONTENT_LENGTH} bytes."#
@@ -299,9 +306,10 @@ conns and ioblocks:
 #"<b>/usr/lib/antiweb.cmu.image</b> or <b>/usr/lib/antiweb.clisp.image</b> or <b>/usr/lib/antiweb.ccl.image</b> - A frozen image of the memory of an Antiweb lisp process. The name depends on your lisp environment."#
       )
       #"You also need to create a hub directory. Inside this directory (typically <b>/var/aw/</b>):"#
-      (ul #"<b>hub.conf</b> - Hub configuration. Includes which interaces/ports to listen for connections on (though you can #(link "faq.html#ADDING-LISTENERS" "add more later without restarting")), the UID the hub should run as, and the file descriptor limit for the hub process."#
+      (ul #"<b>hub.conf</b> - Hub configuration. Includes which interaces/ports to listen for connections on (though you can #(link "faq.html#ADDING-LISTENERS" "add more later without restarting")), the UID the hub and logger processes should run as, and the file descriptor limit for the hub process."#
           #"<b>hub.socket</b> - Unix domain socket for connecting to the hub. It is owned by root and no other user can connect. All Antiweb administration, development, and inter-process communication is done through this socket."#
-          #"<b>aw_log/</b> - The log directory. The hub process is chroot()ed to this directory. This directory name starts with the "aw_" prefix because that is a special prefix and such directories will never be served by Antiweb through HTTP in case of an incorrectly configured HTML root. This convention dates back to Antiweb2. In any case, both of Antiweb's log files are owned and only readable by the hub user. The two log files are: #(ul #"<b>syslog</b> - System log messages. Always check this file first if something isn't working."# #"<b>axslog</b> - Access logs. All valid HTTP requests are recorded here."#) Workers pass log messages to the hub through the unix socket. There are two ways to make the hub #(link "faq.html#REOPEN-LOG-FILES" "reopen its log files")."#
+          #"<b>empty/</b> - An empty directory. The hub process is chroot()ed to this directory. It should have no write permission to this directory."#
+          #"<b>aw_log/</b> - The log directory. The logger process is chroot()ed to this directory. This directory name starts with the "aw_" prefix because that is a special prefix and such directories will never be served by Antiweb through HTTP in case of an incorrectly configured HTML root. This convention dates back to Antiweb2. In any case, both of Antiweb's log files are owned and only readable by the logger user. The two log files are: #(ul #"<b>syslog</b> - System log messages. Always check this file first if something isn't working."# #"<b>axslog</b> - Access logs. All valid HTTP requests are recorded here."#) Workers pass log messages to the hub after which they are passed to the logger process. There are two ways to make the logger #(link "faq.html#REOPEN-LOG-FILES" "reopen its log files")."#
        )
       #"There is one <b>worker.conf</b> file per worker process. These files can live anywhere but a good place is in the <b>/var/aw/</b> hub directory. They should not be owned (or writeable) by any user that a worker or hub runs as."#
       #"Every worker that uses #(link "worker.html#GZIP" "gzip content encoding"), #(link "awp.html" "Anti Webpages"), #(link "worker.html#JSMIN" "javascript minification") or #(link "worker.html#CSSMIN" "CSS minification") must have a #(link "faq.html#CACHE" "cache directory"). This directory must be owned by the user the worker runs as. No other users should have write access to this directory. Cache directories should never be in /tmp/ and should never have sticky bits."#
@@ -309,7 +317,7 @@ conns and ioblocks:
     (unicode "Unicode"
 #"#(tip #"Although all data is internally stored as (and enforced to be) UTF-8, you can map static files to different charsets with the #(link "worker.html#MIME-TYPE" ":mime-type") parameter of the worker conf. Also, in CGIs you can send any mime-type you want."#)
       Antiweb4 supports exactly one type of character data:
-      #(ul #"<b>UTF-8</b> encoded unicode code points."#)
+       #(ul #"<b>UTF-8</b> encoded unicode code points."#)
       All filenames must be UTF-8. The HTML content in #(link "awp.html" "Anti Webpages") is always UTF-8. Here are some technologies <b>NOT</b> supported:
       #(ul "ASCII" "Latin-1" "UTF-16" "etc...")
       The plan is to store user data in #(link "http://www.unicode.org/reports/tr15/" "Normalization Form C") (but this is not implemented yet).
@@ -355,14 +363,14 @@ Password:
          )
          (p #"Antiweb should now be installed. Next create a hub directory:"#
             (pre #"# antiweb -skel-hub-dir /var/aw"#)
-            #"The hub directory you specified should have been created. OPTIONAL: You can now edit the created hub.conf file (ie <b>/var/aw/hub.conf</b>)."#
+            #"The hub directory you specified should have been created. OPTIONAL: You can now edit the created hub.conf file (ie <b>/var/aw/hub.conf</b>). You might do this to change the UIDs the hub and logger processes run as, or to change the ports or interfaces that Antiweb will listen on."#
          )
          (p #"You now need to create one or more worker conf files. They can be stored anywhere, but a good place is along with the hub.conf file in the hub directory:"#
             (pre #"# antiweb -skel-worker-basic > /var/aw/worker.conf"#)
             #"#(tip "-skel-worker-basic is just one of the possible worker skeletons. To see a list of all of them, run <b>antiweb</b> with no arguments.") You will now need to edit the created worker conf (ie <b>/var/aw/worker.conf</b>). At a minimum, you must specify the hub directory created in the previous step, the UID this worker should run as, the virtual hosts this worker should handle, and the location of the HTML root for this worker. For complete details on the config file format, see the #(link "worker.html" "worker conf file reference")."#
-            #"<b>IMPORTANT:</b> No conf files should ever be owned or writeable by a UID that a hub or worker runs as. The conf files don't even need to be readable to them (but a worker's current conf file is stored in memory so making it unreadable only prevents <i>other</i> workers from reading it.)."#
+            #"<b>IMPORTANT:</b> No conf files should ever be owned or writeable by a UID that a hub, logger, or worker process runs as. The conf files don't even need to be readable to them (but a worker's current conf file is stored in memory so making it unreadable only prevents <i>other</i> workers from reading it.)."#
          )
-         (p #"Finally, launch the hub and worker processes:"#
+         (p #"Finally, start the antiweb processes:"#
             (pre #"# antiweb -hub /var/aw
 # antiweb -worker /var/aw/worker.conf"#)
             #"You may also want to ensure that these launch commands are run at start-up. They must be run by root."#
@@ -463,7 +471,7 @@ OK"#) #"And this closes a listener:"#
 
 OK"#))
       (attach #"Can I attach to a running process and give it lisp commands?"#
-                 #"Yes, as long as you have root privileges you can <b>attach to</b> or <b>supervise</b> any Antiweb process through the hub's unix socket. Note that root privileges are dropped once you have attached to the target process. For example, to attach to the hub process, run this command (as root):"# (pre #"# antiweb -attach /var/aw"#) #"Similarly, to supervise a worker process, run this command (as root):"# (pre #"# antiweb -attach /var/aw/worker.conf"#) #"In both cases, you will be shown the output of the stats command run on that process, and then will be given a * prompt: #(pre #"[Antiweb: Attached to HUB] *"#) #(pre #"[Antiweb: Attached to worker HOYTECH] *"#) This is similar to a lisp #(link "http://en.wikipedia.org/wiki/REPL" "REPL"). The *, **, ***, +, ++, and +++ special variables are stored in the process you attached to and are unique per REPL session. The expressions are evaluated by the process being supervised. Although all Antiweb processes only have a single thread of execution, <b>a supervised process will continue to function normally while being supervised.</b>"#)
+                 #"Yes, as long as you have root privileges you can <b>attach to</b> or <b>supervise</b> any hub or worker process through the hub's unix socket. Note that root privileges are dropped once you have attached to the target process. For example, to attach to the hub process, run this command (as root):"# (pre #"# antiweb -attach /var/aw"#) #"Similarly, to supervise a worker process, run this command (as root):"# (pre #"# antiweb -attach /var/aw/worker.conf"#) #"In both cases, you will be shown the output of the stats command run on that process, and then will be given a * prompt: #(pre #"[Antiweb: Attached to HUB] *"#) #(pre #"[Antiweb: Attached to worker HOYTECH] *"#) This is similar to a lisp #(link "http://en.wikipedia.org/wiki/REPL" "REPL"). The *, **, ***, +, ++, and +++ special variables are stored in the process you attached to and are unique per REPL session. The expressions are evaluated by the process being supervised. Although all Antiweb processes only have a single thread of execution, <b>a supervised process will continue to function normally while being supervised.</b>"#)
       (reopen-log-files #"How can I get the hub to reopen its log files?"#
         #"First of all, never send an Antiweb process a HUP signal. All communication with Antiweb is done via the <b>hub.socket</b> unix socket."#
         #"To reopen the hub's log files, #(link "faq.html#ATTACH" "attach") to the hub process and evaluate <b>(reopen-log-files)</b>."#
@@ -476,6 +484,7 @@ OK"#))
 (reopen-log-files)
 
 T"#)
+        #"This will send a reopen-log-files message to the logger process, causing it to close and reopen its log file descriptors."#
         #"When finished, press control-d or use the <b>(quit)</b> command:"#
         (pre #"[Antiweb: Attached to HUB] *
 (quit)

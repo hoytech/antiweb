@@ -6,6 +6,7 @@
   signal handlers (currently just time_for_a_reaping).
 * Bugfix: Improved confusing log message when a worker requires a
   worker cache but none is present.
+* Bugfix: Support closures in install-hub-rewrite-host.
 * Change: Logging is now done by a separate logger process
   which is connected to the hub. This is so that the hub process
   never has to do blocking disk I/O. Furthermore, a compromised

@@ -672,8 +672,9 @@
   (declare (ignore http-headers))
   nil)
 
-(defun install-hub-rewrite-host (lambda-form)
-  (setf (symbol-function 'hub-rewrite-host) (compile nil lambda-form)))
+(defun install-hub-rewrite-host (form)
+  (setf (symbol-function 'hub-rewrite-host)
+        (funcall (compile nil `(lambda () ,form)))))
 
 ;; Shortest host ::1   FIXME technically should allow [::1]:80
 ;; Hub only looks at host, doesn't care about path.
@@ -1428,7 +1429,7 @@
     (let ((hub-uid (aw-lookup-user-name-with-getpwnam (conf-get aw-hub-conf 'hub-uid)))
           (logger-uid (aw-lookup-user-name-with-getpwnam (conf-get aw-hub-conf 'logger-uid)))
           (max-fds (conf-get aw-hub-conf 'max-fds))
-          (install-hub-rewrite-host (conf-get aw-hub-conf 'install-hub-rewrite-host)))
+          (install-hub-rewrite-host-form (conf-get aw-hub-conf 'install-hub-rewrite-host)))
 
       (if (or (not (integerp hub-uid)) (zerop hub-uid))
         (error "hub can't run as root"))
@@ -1453,8 +1454,8 @@
       (hub-start-unix-listener (format nil "~a/hub.socket" aw-hub-dir))
       (if max-fds
         (aw_set_nofile max-fds))
-      (if install-hub-rewrite-host
-        (install-hub-rewrite-host install-hub-rewrite-host))
+      (if install-hub-rewrite-host-form
+        (install-hub-rewrite-host install-hub-rewrite-host-form))
 
       (unless nodaemon (aw-daemonise-drop-terminal))
 

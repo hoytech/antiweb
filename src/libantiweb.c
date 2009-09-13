@@ -1352,7 +1352,7 @@ struct conn *aw_conn_unix(char *path) {
 
 struct conn *aw_listen_inet(char *bind_addr, int port) {
   struct conn *c;
-  int tp=0,sd=-1,rv;
+  int tp=1,sd=-1,rv;
   int ip_ver=0;
 
   if (strchr(bind_addr, ':')) ip_ver = 6;

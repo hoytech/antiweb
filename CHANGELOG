@@ -7,6 +7,8 @@
 * Bugfix: Improved confusing log message when a worker requires a
   worker cache but none is present.
 * Bugfix: Support closures in install-hub-rewrite-host.
+* Bugfix: SO_REUSEADDR wasn't being set properly so sometimes the
+  hub wouldn't restart until you waited for sockets to timeout.
 * Change: Logging is now done by a separate logger process
   which is connected to the hub. This is so that the hub process
   never has to do blocking disk I/O. Furthermore, a compromised

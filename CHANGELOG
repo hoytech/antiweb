@@ -1,4 +1,4 @@
-4.0BETA15
+4.0BETA15   Sep 12, 2009
 
 * Bugfix: Don't allow already registered worker connection to
   register another worker connection.

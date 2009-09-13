@@ -3,7 +3,6 @@ Sec:
 !! limit on # conns from same ip (per worker? per worker AND in the hub? relevant at all for ipv6?)
 do fstats after opening the log files and make sure they are the same inodes as when we did the lstats
 try to crash AW by truncating a file while it is being sent (with and without mmap())
-?? -ftrapv
 
 
 
@@ -28,7 +27,6 @@ fast-files should handle etags if enabled
 easy way to check if file/directory exists in :rewrite rules, like -f in apache rewrite
 
 ?? throttling
-?? basic auth
 ?? rollbacks should capture current HTTP modules too
 ?? -kill should log
 ?? -kill should say "OK" - would need to be special cased cause process can't send back confirmation (it has been killed)

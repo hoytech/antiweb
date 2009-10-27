@@ -605,20 +605,21 @@
       ((411) "Length Required")
       ((413) "Request Entity Too Large")
       ((500) "Internal Server Error")
-      (t (error "Unknown code: ~a" c)))))
+      (t (error "Unknown code: ~a" c))))
 
-;; Expands into a constant string
-(defmacro expand-to-http-err-msg (code code-alpha desc &key close)
-  (let ((body (format nil "<html><body><title>~a ~a</title><h1>~a ~a</h1><h2>~a</h2><br><hr>Antiweb ~a</body></html>"
-                          code code-alpha code code-alpha desc AW_VERSION)))
-    (format nil "HTTP/1.1 ~a ~a~aServer: Antiweb/~a~a~aContent-Type: text/html; charset=utf-8~aContent-Length: ~a~a~a~a"
-                code code-alpha crlf AW_VERSION crlf
-                (if close (format nil "Connection: close~a" crlf) "")
-                crlf (length body) crlf crlf body)))
+  (defun compile-http-err-msg-response (code code-alpha desc &key close)
+    (let ((body (format nil "<html><body><title>~a ~a</title><h1>~a ~a</h1><h2>~a</h2><br><hr>Antiweb ~a</body></html>"
+			    code code-alpha code code-alpha desc AW_VERSION)))
+      (format nil "HTTP/1.1 ~a ~a~aServer: Antiweb/~a~a~aContent-Type: text/html; charset=utf-8~aContent-Length: ~a~a~a~a"
+		  code code-alpha crlf AW_VERSION crlf
+		  (if close (format nil "Connection: close~a" crlf) "")
+		  crlf (length body) crlf crlf body))))
 
-(defmacro send-err-to-conn (c code code-alpha desc &rest keys)
+(defmacro send-err-to-conn (c code code-alpha desc &key close)
   `(write-to-conn-from-string ,c
-     (expand-to-http-err-msg ,code ,code-alpha ,desc ,@keys)))
+     ,(if (stringp desc)
+        (compile-http-err-msg-response code code-alpha desc :close close)
+        `(compile-http-err-msg-response ,code ,code-alpha ,desc :close ,close))))
 
 (defun linger-this-http-conn (c)
   (remove_from_artificial_ready_conns c)

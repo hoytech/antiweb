@@ -46,16 +46,6 @@
 
 
 
-
-;; returns t on success, otherwise string description of error
-(defun awp-compile-error-wrapper (awp-file curr-mtime output-dir)
-  (let ((ret-value t))
-    (ignore-errors
-      (handler-bind ((error (lambda (condition)
-                              (setq ret-value (format nil "~a" condition))))) 
-        (awp-compile awp-file curr-mtime output-dir)))
-    ret-value))
-
 ;; returns t on success, otherwise throws error
 (defun awp-compile (awp-file curr-mtime output-dir)
   (let ((rec (gethash awp-file awp-loaded-pages)))

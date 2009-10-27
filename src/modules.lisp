@@ -83,10 +83,25 @@ body,h1 { margin:10px; font-family: Verdana, Arial, sans-serif; }
              (return-this-closure keepalive-closure))
            (let ((awp-file-path ,(http-root-translate handler 'http-path))
                  (cache-path (format nil "~a/~a~a" (get-aw-worker-cache-or-error) ,(car (xconf-get handler :hosts)) http-path)))
-             (let ((awp-compile-result (awp-compile-error-wrapper awp-file-path (aw_stat_get_mtime stat) cache-path)))
-               (when (stringp awp-compile-result)
-                 (aw-log () "AWP compile-time error in ~a (~a)" awp-file-path awp-compile-result)
-                 (err-and-linger 500 "AWP compile-time error. See syslog.")))
+             (handler-bind ((error (lambda (condition)
+                                      ,(case (xconf-get handler :awp-failure-reaction)
+                                         ((:die nil)
+                                           nil) ; do nothing and let error propogate, terminating worker
+                                         ((:ignore-and-log-to-syslog)
+                                           `(progn
+                                              (aw-log () "AWP compile-time error in ~a (~a)"
+                                                         awp-file-path condition)
+                                              (err-and-linger 500 "AWP compile-time error. See syslog.")))
+                                         ((:ignore-and-log-to-syslog+browser)
+                                           `(progn
+                                              (aw-log () "AWP compile-time error in ~a (~a)"
+                                                         awp-file-path condition)
+                                              (err-and-linger 500 (format nil "AWP compile-time error in ~a <br><br> (~a)"
+                                                                              awp-file-path condition))))
+                                         (t
+                                           (error "Unknown :awp-failure-reaction parameter: ~a"
+                                                  (xconf-get handler :awp-failure-reaction)))))))
+               (awp-compile awp-file-path (aw_stat_get_mtime stat) cache-path))
              (setq $u-awp-real-path (format nil "~a~a" cache-path (if (= 1 (length $u-path-info))
                                                                     "/index.html" $u-path-info)))
              (handler-bind ((error (lambda (condition)

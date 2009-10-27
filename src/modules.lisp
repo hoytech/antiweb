@@ -86,7 +86,8 @@ body,h1 { margin:10px; font-family: Verdana, Arial, sans-serif; }
              (handler-bind ((error (lambda (condition)
                                       ,(case (xconf-get handler :awp-failure-reaction)
                                          ((:die nil)
-                                           nil) ; do nothing and let error propogate, terminating worker
+                                           `(error "AWP compile-time error in ~a (~a)"
+                                                   awp-file-path condition))
                                          ((:ignore-and-log-to-syslog)
                                            `(progn
                                               (aw-log () "AWP compile-time error in ~a (~a)"
@@ -107,7 +108,8 @@ body,h1 { margin:10px; font-family: Verdana, Arial, sans-serif; }
              (handler-bind ((error (lambda (condition)
                                       ,(case (xconf-get handler :awp-failure-reaction)
                                          ((:die nil)
-                                           nil) ; do nothing and let error propogate, terminating worker
+                                           `(error "AWP run-time error in ~a (~a)"
+                                                   awp-file-path condition))
                                          ((:ignore-and-log-to-syslog)
                                            `(progn
                                               (aw-log () "AWP run-time error in ~a (~a)"

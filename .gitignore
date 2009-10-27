@@ -1,3 +1,4 @@
+/local.lisp
 *.x86f
 *.sse2f
 *.fasl

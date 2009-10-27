@@ -85,8 +85,8 @@ body,h1 { margin:10px; font-family: Verdana, Arial, sans-serif; }
                  (cache-path (format nil "~a/~a~a" (get-aw-worker-cache-or-error) ,(car (xconf-get handler :hosts)) http-path)))
              (let ((awp-compile-result (awp-compile-error-wrapper awp-file-path (aw_stat_get_mtime stat) cache-path)))
                (when (stringp awp-compile-result)
-                 (aw-log () "failed .awp request: (~a) ~a" awp-file-path awp-compile-result)
-                 (err-and-linger 500 "Anti Webpage didn't compile. See syslog.")))
+                 (aw-log () "AWP compile-time error in ~a (~a)" awp-file-path awp-compile-result)
+                 (err-and-linger 500 "AWP compile-time error. See syslog.")))
              (setq $u-awp-real-path (format nil "~a~a" cache-path (if (= 1 (length $u-path-info))
                                                                     "/index.html" $u-path-info)))
              (handler-bind ((error (lambda (condition)
@@ -95,14 +95,14 @@ body,h1 { margin:10px; font-family: Verdana, Arial, sans-serif; }
                                            nil) ; do nothing and let error propogate, terminating worker
                                          ((:ignore-and-log-to-syslog)
                                            `(progn
-                                              (aw-log () "AWP 500 error sent: (~a) ~a"
+                                              (aw-log () "AWP run-time error in ~a (~a)"
                                                          awp-file-path condition)
-                                              (err-and-linger 500 "AWP error. See syslog.")))
+                                              (err-and-linger 500 "AWP run-time error. See syslog.")))
                                          ((:ignore-and-log-to-syslog+browser)
                                            `(progn
-                                              (aw-log () "AWP 500 error sent: (~a) ~a"
+                                              (aw-log () "AWP run-time error in ~a (~a)"
                                                          awp-file-path condition)
-                                              (err-and-linger 500 (format nil "AWP error: (~a) ~a"
+                                              (err-and-linger 500 (format nil "AWP run-time error in ~a <br><br> (~a)"
                                                                               awp-file-path condition))))
                                          (t
                                            (error "Unknown :awp-failure-reaction parameter: ~a"

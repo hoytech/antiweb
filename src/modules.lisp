@@ -89,40 +89,58 @@ body,h1 { margin:10px; font-family: Verdana, Arial, sans-serif; }
                  (err-and-linger 500 "Anti Webpage didn't compile. See syslog.")))
              (setq $u-awp-real-path (format nil "~a~a" cache-path (if (= 1 (length $u-path-info))
                                                                     "/index.html" $u-path-info)))
-             (when (eq http-method 'post)
-               (let ((post-len (parse-integer $h-content-length)))
-                 (if (zerop post-len)
-                   (err-and-linger 400 "Empty POST to AWP file"))
-                 (if (> post-len AW_MAX_MSG_LENGTH)
-                   (err-and-linger 413 "POST Content-Length too large for AWP file"))
-                 (cffi:with-foreign-slots ((ready limit sep) c conn)
-                   (return-from http-user-dispatch-macro
-                     (read-fixed-length-message-from-conn-and-store-in-shared-input-buffer post-len
-                       (block http-user-dispatch-macro
-                         (let ((post-handlers (awp-page-post-handlers (gethash awp-file-path awp-loaded-pages))))
-                           (dolist (ph post-handlers)
-                             (let ((res (funcall ph $u-path-info
-                                                 :cookie $h-cookie
-                                                 :referer $h-referer
-                                                 :args shared-input-buffer)))
-                               (when (stringp res)
-                                 (send-raw res)
-                                 (keepalive)))))
-                         (err-and-linger 405 "Unhandled POST to AWP file")))))))
-             (when (eq http-method 'get)
-               (let ((get-handlers (awp-page-get-handlers (gethash awp-file-path awp-loaded-pages))))
-                 (dolist (gh get-handlers)
-                   (let ((res (funcall gh $u-path-info
-                                       :ip $ip
-                                       :cookie $h-cookie
-                                       :referer $h-referer
-                                       :args http-args
-                                       :x-real-ip ,(if (xconf-get handler :accept-x-real-ip-from)
-                                                     '$u-used-x-real-ip)
-                              )))
-                     (when (stringp res)
-                       (send-raw res)
-                       (keepalive)))))))))))
+             (handler-bind ((error (lambda (condition)
+                                      ,(case (xconf-get handler :awp-failure-reaction)
+                                         ((:die nil)
+                                           nil) ; do nothing and let error propogate, terminating worker
+                                         ((:ignore-and-log-to-syslog)
+                                           `(progn
+                                              (aw-log () "AWP 500 error sent: (~a) ~a"
+                                                         awp-file-path condition)
+                                              (err-and-linger 500 "AWP error. See syslog.")))
+                                         ((:ignore-and-log-to-syslog+browser)
+                                           `(progn
+                                              (aw-log () "AWP 500 error sent: (~a) ~a"
+                                                         awp-file-path condition)
+                                              (err-and-linger 500 (format nil "AWP error: (~a) ~a"
+                                                                              awp-file-path condition))))
+                                         (t
+                                           (error "Unknown :awp-failure-reaction parameter: ~a"
+                                                  (xconf-get handler :awp-failure-reaction)))))))
+	       (when (eq http-method 'post)
+		 (let ((post-len (parse-integer $h-content-length)))
+		   (if (zerop post-len)
+		     (err-and-linger 400 "Empty POST to AWP file"))
+		   (if (> post-len AW_MAX_MSG_LENGTH)
+		     (err-and-linger 413 "POST Content-Length too large for AWP file"))
+		   (cffi:with-foreign-slots ((ready limit sep) c conn)
+		     (return-from http-user-dispatch-macro
+		       (read-fixed-length-message-from-conn-and-store-in-shared-input-buffer post-len
+			 (block http-user-dispatch-macro
+			   (let ((post-handlers (awp-page-post-handlers (gethash awp-file-path awp-loaded-pages))))
+			     (dolist (ph post-handlers)
+			       (let ((res (funcall ph $u-path-info
+						   :cookie $h-cookie
+						   :referer $h-referer
+						   :args shared-input-buffer)))
+				 (when (stringp res)
+				   (send-raw res)
+				   (keepalive)))))
+			   (err-and-linger 405 "Unhandled POST to AWP file")))))))
+	       (when (eq http-method 'get)
+		 (let ((get-handlers (awp-page-get-handlers (gethash awp-file-path awp-loaded-pages))))
+		   (dolist (gh get-handlers)
+		     (let ((res (funcall gh $u-path-info
+					 :ip $ip
+					 :cookie $h-cookie
+					 :referer $h-referer
+					 :args http-args
+					 :x-real-ip ,(if (xconf-get handler :accept-x-real-ip-from)
+						       '$u-used-x-real-ip)
+				)))
+		       (when (stringp res)
+			 (send-raw res)
+			 (keepalive))))))))))))
 
 
 (antiweb-module mod-cgi

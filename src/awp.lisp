@@ -62,13 +62,14 @@
     (if (and rec
              (awp-page-failed-compile rec)
              (= curr-mtime (awp-page-mtime rec)))
-      (error "there was an error last time we compiled this .awp and mtime hasn't changed"))
+      (error "there was an error last time we compiled this AWP and mtime hasn't changed: ~a"
+             (awp-page-failed-compile rec)))
     (when (or (not rec)
               (/= curr-mtime (awp-page-mtime rec)))
      (handler-bind ((error (lambda (condition)
-                             (declare (ignore condition))
                              (setf (gethash awp-file awp-loaded-pages)
-                                   (make-awp-page :mtime curr-mtime :failed-compile t)))))
+                                   (make-awp-page :mtime curr-mtime
+                                                  :failed-compile (format nil "~a" condition))))))
       (let ((conf (load-conf-from-file awp-file))
             (awp-glue-modules awp-glue-modules))
         (cffi:with-foreign-string (fstr (format nil "~a/" output-dir))

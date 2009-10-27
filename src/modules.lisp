@@ -85,10 +85,10 @@ body,h1 { margin:10px; font-family: Verdana, Arial, sans-serif; }
                  (cache-path (format nil "~a/~a~a" (get-aw-worker-cache-or-error) ,(car (xconf-get handler :hosts)) http-path)))
              (handler-bind ((error (lambda (condition)
                                       ,(case (xconf-get handler :awp-failure-reaction)
-                                         ((:die nil)
+                                         ((:die)
                                            `(error "AWP compile-time error in ~a (~a)"
                                                    awp-file-path condition))
-                                         ((:ignore-and-log-to-syslog)
+                                         ((nil :ignore-and-log-to-syslog)
                                            `(progn
                                               (aw-log () "AWP compile-time error in ~a (~a)"
                                                          awp-file-path condition)
@@ -107,10 +107,10 @@ body,h1 { margin:10px; font-family: Verdana, Arial, sans-serif; }
                                                                     "/index.html" $u-path-info)))
              (handler-bind ((error (lambda (condition)
                                       ,(case (xconf-get handler :awp-failure-reaction)
-                                         ((:die nil)
+                                         ((:die)
                                            `(error "AWP run-time error in ~a (~a)"
                                                    awp-file-path condition))
-                                         ((:ignore-and-log-to-syslog)
+                                         ((nil :ignore-and-log-to-syslog)
                                            `(progn
                                               (aw-log () "AWP run-time error in ~a (~a)"
                                                          awp-file-path condition)

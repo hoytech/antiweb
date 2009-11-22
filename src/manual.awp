@@ -194,7 +194,6 @@ Host -> HTML root mappings:
       #"You can always get a break-down of the memory being used by an Antiweb process with the <b>-room</b> command. Here is what it might look like when you query a worker using CMUCL:"#
       (pre #"
 # antiweb -room /var/aw/example.conf
-Reloaded library "libantiweb32.so"
 
 "---ANTIWEB MEMORY STATS---
 Dynamic Space Usage:        1,946,272 bytes (out of  512 MB).
@@ -619,7 +618,6 @@ http {
 )
       (cmucl-limitations #"Are there any known limitations with CMUCL?"#
         (ul
-          ;#"CMUCL currently needs to see the libantiweb32.so file in a system library directory when it saves the image. This means that on new systems where Antiweb has never been installed before, Antiweb/CMUCL needs to be built and installed twice. The #(link "install.html" "installation instructions") have details on how to do this. We are looking into a workaround for this."#
           ;#"CMUCL will always load the libantiweb32.so library from a system library directory, even if Antiweb tells it to load a freshly compiled version from the bin/ directory. If you add a new function to libantiweb.c, you will need to delete the library from its system location prior to recompiling Antiweb. This is only a problem during development and when upgrading Antiweb. We are looking into a workaround for this."#
           #"CMUCL mmap()s a large amount of address space which can stop it from running on certain VPS systems. Note that most of this address space doesn't map to real memory. The <b>-dynamic-space-size</b> doesn't seem to reduce the size of the mmap() unfortunately. SBCL does this, probably CMUCL can too."#
         )

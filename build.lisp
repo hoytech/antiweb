@@ -197,6 +197,23 @@ int main() {
     (if-match (#~m|/(libantiweb\d\d[.]so)$| (cdr i))
       (setf (cdr i) $1))))
 
+;; HACK for CMUCL: On start-up, when CMUCL re-loads the antiweb foreign library it prints
+;; the text  Reloaded library "libantiweb32.so"  which clutters the output of most antiweb
+;; commands. This hack removes the function that prints this from ext:*after-save-initializations*
+;; and puts in place a function that executes the original function but discards what was
+;; written to standard output.
+#+cmu
+(when (ignore-errors (symbol-function 'system::reinitialize-global-table)) ; do nothing if this changes in CMUCL
+  (setf ext:*after-save-initializations*
+        (delete #'system::reinitialize-global-table ext:*after-save-initializations*))
+  (push 
+    (funcall (compile nil (lambda ()
+      (let ((orig-global-table (symbol-function 'system::reinitialize-global-table)))
+        (lambda ()
+          (with-output-to-string (*standard-output*)
+            (funcall orig-global-table)))))))
+    ext:*after-save-initializations*))
+
 
 (format t "BUILD: Converting libantiweb.h into libantiweb-h.lisp and loading it~%")
 (funcall (compile nil (lambda ()

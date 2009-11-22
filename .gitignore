@@ -1,9 +1,11 @@
+# Build config files:
 /local.lisp
+# Build artifacts:
+/bin/*
+/src/libantiweb-h.lisp
 *.x86f
 *.sse2f
 *.fasl
 *.lib
 *.fas
 *.lx64fsl
-bin/
-src/libantiweb-h.lisp

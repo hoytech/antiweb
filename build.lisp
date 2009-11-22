@@ -292,6 +292,7 @@ Launching Antiweb:
   antiweb -check-worker <worker conf file>
 
 Maintenance/Development:
+  antiweb -version [hub directory or worker conf file]
   antiweb -reload <worker conf file>
   antiweb -reopen-log-files <hub directory>
   antiweb -add-listener <hub directory> <ip> <port>
@@ -473,6 +474,23 @@ if ($switch eq "-hub") {
     exec_lisp("(run-supervise-hub \"$arg\" \"(aw-room)\" t)");
   } elsif (-f $arg) {
     exec_lisp("(run-supervise-worker \"$arg\" \"(aw-room)\" t)");
+  }
+  die "not a hub directory or worker conf file: $arg";
+} elsif ($switch eq "-version") {
+  print "System's installed Antiweb version: $AW_VERSION\n\n";
+  my $arg = shift;
+  if (!$arg) {
+    print "  Provide either a hub directory or a worker conf file as an argument to\n";
+    print "  -version to see what version the specified hub or worker process is running.\n";
+    exit;
+  }
+  die "Path to hubdir/worker conf must be absolute" unless $arg =~ m|^/|;
+  if (-d $arg) {
+    print "HUB $arg is running Antiweb version...\n";
+    exec_lisp("(run-supervise-hub \"$arg\" \"AW_VERSION\" t)");
+  } elsif (-f $arg) {
+    print "WORKER $arg is running Antiweb version...\n";
+    exec_lisp("(run-supervise-worker \"$arg\" \"AW_VERSION\" t)");
   }
   die "not a hub directory or worker conf file: $arg";
 } elsif ($switch eq "-repl") {

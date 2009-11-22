@@ -582,6 +582,8 @@ print <<END;
   :awp ; no problem as long as you have a cache
 )
 END
+} elsif ($switch =~ m/^--?h(elp|)$/i) {
+  usage();
 } else {
   die "Unknown switch: $switch";
 }

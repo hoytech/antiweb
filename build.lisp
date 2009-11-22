@@ -267,6 +267,8 @@ int main() {
 
   (format o #"$lib_dir = "~a";~%"# aw-lib-dir)
 
+  (format o #"$AW_VERSION = "~a";~%"# AW_VERSION)
+
   (format o #"$cmu_exec = "~a";~%"# aw-cmu-executable)
   (format o #"$clisp_exec = "~a";~%"# aw-clisp-executable)
   (format o #"$ccl_exec = "~a";~%"# aw-ccl-executable)
@@ -275,7 +277,7 @@ int main() {
 
 sub usage {
   print <<END;
-Antiweb Launch Script - (C) Doug Hoyte
+Antiweb v$AW_VERSION Launch Script - (C) Doug Hoyte
   antiweb [optional flags] -command [parameters]
 
 Installation Skeletons:

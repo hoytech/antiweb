@@ -263,15 +263,18 @@ int main() {
 
 (format t "BUILD: Creating Antiweb launch script~%")
 (with-open-file (o "bin/antiweb" :direction :output :if-exists :supersede)
-  (format o #"#!/usr/bin/perl~%~%$cl_sys = "~a";~%"# #+cmu "cmu" #+clisp "clisp" #+ccl "ccl")
+  (format o #"#!/usr/bin/perl~%"#)
+  (format o #"use strict;~%"#)
 
-  (format o #"$lib_dir = "~a";~%"# aw-lib-dir)
+  (format o #"my $cl_sys = "~a";~%"# #+cmu "cmu" #+clisp "clisp" #+ccl "ccl")
 
-  (format o #"$AW_VERSION = "~a";~%"# AW_VERSION)
+  (format o #"my $lib_dir = "~a";~%"# aw-lib-dir)
 
-  (format o #"$cmu_exec = "~a";~%"# aw-cmu-executable)
-  (format o #"$clisp_exec = "~a";~%"# aw-clisp-executable)
-  (format o #"$ccl_exec = "~a";~%"# aw-ccl-executable)
+  (format o #"my $AW_VERSION = "~a";~%"# AW_VERSION)
+
+  (format o #"my $cmu_exec = "~a";~%"# aw-cmu-executable)
+  (format o #"my $clisp_exec = "~a";~%"# aw-clisp-executable)
+  (format o #"my $ccl_exec = "~a";~%"# aw-ccl-executable)
 
   (princ #>END_OF_ANTIWEB_LAUNCH_SCRIPT
 
@@ -312,23 +315,9 @@ END
   exit;
 }
 
-sub exec_lisp {
-  my $expr = shift;
-
-  if ($cl_sys eq "cmu") {
-    exec("$cmu_exec -quiet -core '$lib_dir/antiweb.cmu.image' -eval '$expr'");
-    die "Couldn't exec CMUCL at $cl_exec";
-  } elsif ($cl_sys eq "clisp") {
-    my $q="";
-    $q = "cat | " if $noreadline;
-    exec("$q $clisp_exec -q -repl -M '$lib_dir/antiweb.clisp.image' -x '$expr'");
-    die "Couldn't exec CLISP at $cl_exec";
-  } elsif ($cl_sys eq "ccl") {
-    exec("$ccl_exec -Q -I '$lib_dir/antiweb.ccl.image' -e '$expr'");
-    die "Couldn't exec ClozureCL at $cl_exec";
-  }
-  die "Unknown cl_sys: $cl_sys";
-}
+my $switch;
+my $nodaemon;
+my $noreadline;
 
 while(1) {
   $switch = shift or usage();
@@ -348,6 +337,26 @@ while(1) {
   }
 }
 
+
+sub exec_lisp {
+  my $expr = shift;
+
+  if ($cl_sys eq "cmu") {
+    system("$cmu_exec -quiet -core '$lib_dir/antiweb.cmu.image' -eval '$expr'")
+      && "Couldn't exec CMUCL at $cmu_exec";
+  } elsif ($cl_sys eq "clisp") {
+    my $q="";
+    $q = "cat | " if $noreadline;
+    system("$q $clisp_exec -q -repl -M '$lib_dir/antiweb.clisp.image' -x '$expr'")
+      && die "Couldn't exec CLISP at $clisp_exec";
+  } elsif ($cl_sys eq "ccl") {
+    system("$ccl_exec -Q -I '$lib_dir/antiweb.ccl.image' -e '$expr'")
+      && die "Couldn't exec ClozureCL at $ccl_exec";
+  } else {
+    die "Unknown cl_sys: $cl_sys";
+  }
+  exit;
+}
 
 sub attempt_connection_to_unix_socket {
   use IO::Socket;
@@ -369,7 +378,7 @@ sub my_sleep {
 }
 
 if ($switch eq "-hub") {
-  $arg = shift or usage();
+  my $arg = shift or usage();
   die "Not a hub directory: $arg" unless (-d $arg);
   die "Path to hub directory must be absolute" unless $arg =~ m|^/|;
   die "Couldn't find $arg/hub.conf" unless (-f "$arg/hub.conf");
@@ -405,43 +414,43 @@ if ($switch eq "-hub") {
   print STDERR "LOGGER: Gave up trying to connect to hub.\n";
   exit(-1);
 } elsif ($switch eq "-worker") {
-  $arg = shift or usage();
+  my $arg = shift or usage();
   die "Not a worker conf: $arg" unless (-f $arg);
   die "Path to worker conf must be absolute" unless $arg =~ m|^/|;
   exec_lisp("(run-worker \"$arg\" :nodaemon t)") if $nodaemon;
   exec_lisp("(run-worker \"$arg\")");
 } elsif ($switch eq "-check-worker") {
-  $arg = shift or usage();
+  my $arg = shift or usage();
   die "Not a worker conf: $arg" unless (-f $arg);
   die "Path to worker conf must be absolute" unless $arg =~ m|^/|;
   exec_lisp("(run-worker \"$arg\" :nodaemon t :checking t)") if $nodaemon;
   exec_lisp("(run-worker \"$arg\" :checking t)");
 } elsif ($switch eq "-reload") {
-  $arg = shift or usage();
+  my $arg = shift or usage();
   die "Not a worker conf: $arg" unless (-f $arg);
   die "Path to worker conf must be absolute" unless $arg =~ m|^/|;
   exec_lisp("(run-reload-worker-conf \"$arg\")");
 } elsif ($switch eq "-reopen-log-files") {
-  $arg = shift or usage();
+  my $arg = shift or usage();
   die "Not a hub directory: $arg" unless (-d $arg);
   die "Path to hubdir/worker conf must be absolute" unless $arg =~ m|^/|;
   exec_lisp("(run-supervise-hub \"$arg\" \"(aw-hub-reopen-log-files)\" t)");
 } elsif ($switch eq "-add-listener") {
-  $dir = shift or usage();
-  $ip = shift or usage();
-  $port = shift or usage();
+  my $dir = shift or usage();
+  my $ip = shift or usage();
+  my $port = shift or usage();
   die "Not a hub directory: $dir" unless (-d $dir);
   die "Path to hubdir must be absolute" unless $dir =~ m|^/|;
   exec_lisp("(run-add-listener \"$dir\" \"$ip\" $port)");
 } elsif ($switch eq "-close-listener") {
-  $dir = shift or usage();
-  $ip = shift or usage();
-  $port = shift or usage();
+  my $dir = shift or usage();
+  my $ip = shift or usage();
+  my $port = shift or usage();
   die "Not a hub directory: $dir" unless (-d $dir);
   die "Path to hubdir must be absolute" unless $dir =~ m|^/|;
   exec_lisp("(run-supervise-hub \"$dir\" #\"(hub-close-inet-listener \"$ip\" $port)\"# t)");
 } elsif ($switch eq "-attach") {
-  $arg = shift or usage();
+  my $arg = shift or usage();
   die "Path to hubdir/worker conf must be absolute" unless $arg =~ m|^/|;
   if (-d $arg) {
     exec_lisp("(run-supervise-hub \"$arg\")");
@@ -450,7 +459,7 @@ if ($switch eq "-hub") {
   }
   die "not a hub directory or worker conf file: $arg";
 } elsif ($switch eq "-kill") {
-  $arg = shift or usage();
+  my $arg = shift or usage();
   die "Path to hubdir/worker conf must be absolute" unless $arg =~ m|^/|;
   if (-d $arg) {
     exec_lisp("(run-supervise-hub \"$arg\" \"(quit)\")");
@@ -459,7 +468,7 @@ if ($switch eq "-hub") {
   }
   die "not a hub directory or worker conf file: $arg";
 } elsif ($switch eq "-stats") {
-  $arg = shift or usage();
+  my $arg = shift or usage();
   die "Path to hubdir/worker conf must be absolute" unless $arg =~ m|^/|;
   if (-d $arg) {
     exec_lisp("(run-supervise-hub \"$arg\" \"(stats)\" t)");
@@ -468,7 +477,7 @@ if ($switch eq "-hub") {
   }
   die "not a hub directory or worker conf file: $arg";
 } elsif ($switch eq "-room") {
-  $arg = shift or usage();
+  my $arg = shift or usage();
   die "Path to hubdir/worker conf must be absolute" unless $arg =~ m|^/|;
   if (-d $arg) {
     exec_lisp("(run-supervise-hub \"$arg\" \"(aw-room)\" t)");
@@ -496,24 +505,24 @@ if ($switch eq "-hub") {
 } elsif ($switch eq "-repl") {
   exec_lisp("(do-aw-init nil)");
 } elsif ($switch eq "-eval") {
-  $expr = shift or usage();
+  my $expr = shift or usage();
   exec_lisp("(unwind-protect (progn $expr) (quit))");
 } elsif ($switch eq "-awp") {
-  $awpfile = shift or usage();
-  $basedir = shift or usage();
+  my $awpfile = shift or usage();
+  my $basedir = shift or usage();
   die "first argument to -awp must be absolute path to an .awp file"
     unless ($awpfile =~ m|^/| && $awpfile =~ m|/([^/]+[.]awp)$|i && (-f $awpfile));
   $awpfile =~ m|/([^/]+[.]awp)|;
-  $name = $1;
+  my $name = $1;
   die "second argument to -awp must be absolute path to a base directory" unless ($basedir =~ m|^/| && (-d $basedir));
-  $dirtomake = "$basedir/$name";
+  my $dirtomake = "$basedir/$name";
   die ".awp files can't be compiled to the same directory they are stored" if (-f $dirtomake);
   exec_lisp("(progn (do-aw-init nil) (unwind-protect (awp-compile \"$awpfile\" 0 \"$basedir/$name\") (quit)))");
 } elsif ($switch eq "-skel-hub-dir") {
-  $dir = shift or die "need a directory to create for the hub";
+  my $dir = shift or die "need a directory to create for the hub";
 
-  $hub_user = 20000;
-  $logger_user = 20001;
+  my $hub_user = 20000;
+  my $logger_user = 20001;
 
   die "$dir already exists" if (-e $dir);
   mkdir($dir) or die "unable to mkdir: $dir";
@@ -607,8 +616,8 @@ END
 }
 
 sub skel_to_file {
-  $filename = shift;
-  $contents = shift;
+  my $filename = shift;
+  my $contents = shift;
 
   open(FH, ">$filename");
   print FH $contents;

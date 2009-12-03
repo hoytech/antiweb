@@ -1,3 +1,24 @@
+4.0BETA16
+
+* Bugfix: Prevent CMUCL from printing annoying Reloaded library
+  "libantiweb32.so" message on start-up.
+* Feature: antiweb launch script shows usage() when given common
+  help style arguments like -h or --help.
+* Feature: New antiweb launch script command -version which prints the
+  installed version of antiweb. If an option is passed to -version,
+  it will also connect to a worker or hub and determine the antiweb
+  version that process is actually running.
+* Feature: :awp-failure-reaction xconf option to handlers in worker
+  conf files. This setting controls what happens when an unhandled
+  exception is raised during a request to an AWP file. Permitted
+  values are :die, :ignore-and-log-to-syslog, and
+  :ignore-and-log-to-syslog+browser.
+* Feature: Improved output of syslog entries when a worker dies
+  because of an AWP error.
+* Change: The default value for :awp-failure-reaction used to be
+  the equivalent of :die. Now it is :ignore-and-log-to-syslog.
+
+
 4.0BETA15   Sep 12, 2009
 
 * Bugfix: Don't allow already registered worker connection to

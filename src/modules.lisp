@@ -124,40 +124,40 @@ body,h1 { margin:10px; font-family: Verdana, Arial, sans-serif; }
                                          (t
                                            (error "Unknown :awp-failure-reaction parameter: ~a"
                                                   (xconf-get handler :awp-failure-reaction)))))))
-	       (when (eq http-method 'post)
-		 (let ((post-len (parse-integer $h-content-length)))
-		   (if (zerop post-len)
-		     (err-and-linger 400 "Empty POST to AWP file"))
-		   (if (> post-len AW_MAX_MSG_LENGTH)
-		     (err-and-linger 413 "POST Content-Length too large for AWP file"))
-		   (cffi:with-foreign-slots ((ready limit sep) c conn)
-		     (return-from http-user-dispatch-macro
-		       (read-fixed-length-message-from-conn-and-store-in-shared-input-buffer post-len
-			 (block http-user-dispatch-macro
-			   (let ((post-handlers (awp-page-post-handlers (gethash awp-file-path awp-loaded-pages))))
-			     (dolist (ph post-handlers)
-			       (let ((res (funcall ph $u-path-info
-						   :cookie $h-cookie
-						   :referer $h-referer
-						   :args shared-input-buffer)))
-				 (when (stringp res)
-				   (send-raw res)
-				   (keepalive)))))
-			   (err-and-linger 405 "Unhandled POST to AWP file")))))))
-	       (when (eq http-method 'get)
-		 (let ((get-handlers (awp-page-get-handlers (gethash awp-file-path awp-loaded-pages))))
-		   (dolist (gh get-handlers)
-		     (let ((res (funcall gh $u-path-info
-					 :ip $ip
-					 :cookie $h-cookie
-					 :referer $h-referer
-					 :args http-args
-					 :x-real-ip ,(if (xconf-get handler :accept-x-real-ip-from)
-						       '$u-used-x-real-ip)
-				)))
-		       (when (stringp res)
-			 (send-raw res)
-			 (keepalive))))))))))))
+               (when (eq http-method 'post)
+                 (let ((post-len (parse-integer $h-content-length)))
+                   (if (zerop post-len)
+                     (err-and-linger 400 "Empty POST to AWP file"))
+                   (if (> post-len AW_MAX_MSG_LENGTH)
+                     (err-and-linger 413 "POST Content-Length too large for AWP file"))
+                   (cffi:with-foreign-slots ((ready limit sep) c conn)
+                     (return-from http-user-dispatch-macro
+                       (read-fixed-length-message-from-conn-and-store-in-shared-input-buffer post-len
+                         (block http-user-dispatch-macro
+                           (let ((post-handlers (awp-page-post-handlers (gethash awp-file-path awp-loaded-pages))))
+                             (dolist (ph post-handlers)
+                               (let ((res (funcall ph $u-path-info
+                                                   :cookie $h-cookie
+                                                   :referer $h-referer
+                                                   :args shared-input-buffer)))
+                                 (when (stringp res)
+                                   (send-raw res)
+                                   (keepalive)))))
+                           (err-and-linger 405 "Unhandled POST to AWP file")))))))
+               (when (eq http-method 'get)
+                 (let ((get-handlers (awp-page-get-handlers (gethash awp-file-path awp-loaded-pages))))
+                   (dolist (gh get-handlers)
+                     (let ((res (funcall gh $u-path-info
+                                         :ip $ip
+                                         :cookie $h-cookie
+                                         :referer $h-referer
+                                         :args http-args
+                                         :x-real-ip ,(if (xconf-get handler :accept-x-real-ip-from)
+                                                       '$u-used-x-real-ip)
+                                )))
+                       (when (stringp res)
+                         (send-raw res)
+                         (keepalive))))))))))))
 
 
 (antiweb-module mod-cgi

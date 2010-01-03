@@ -107,47 +107,11 @@ body,h1 { margin:10px; font-family: Verdana, Arial, sans-serif; }
              (return-this-closure keepalive-closure))
            (let ((awp-file-path ,(http-root-translate handler 'http-path))
                  (cache-path (format nil "~a/~a~a" (get-aw-worker-cache-or-error) ,(car (xconf-get handler :hosts)) http-path)))
-             (handler-bind ((error (lambda (condition)
-                                      ,(case (xconf-get handler :awp-failure-reaction)
-                                         ((:die)
-                                           `(error "AWP compile-time error in ~a (~a)"
-                                                   awp-file-path condition))
-                                         ((nil :ignore-and-log-to-syslog)
-                                           `(progn
-                                              (aw-log () "AWP compile-time error in ~a (~a)"
-                                                         awp-file-path condition)
-                                              (err-and-linger 500 "AWP compile-time error. See syslog.")))
-                                         ((:ignore-and-log-to-syslog+browser)
-                                           `(progn
-                                              (aw-log () "AWP compile-time error in ~a (~a)"
-                                                         awp-file-path condition)
-                                              (err-and-linger 500 (format nil "AWP compile-time error in ~a <br><br> (~a)"
-                                                                              awp-file-path condition))))
-                                         (t
-                                           (error "Unknown :awp-failure-reaction parameter: ~a"
-                                                  (xconf-get handler :awp-failure-reaction)))))))
+             (with-awp-error-handler "compile-time"
                (awp-compile awp-file-path (aw_stat_get_mtime stat) cache-path))
              (setq $u-awp-real-path (format nil "~a~a" cache-path (if (= 1 (length $u-path-info))
                                                                     "/index.html" $u-path-info)))
-             (handler-bind ((error (lambda (condition)
-                                      ,(case (xconf-get handler :awp-failure-reaction)
-                                         ((:die)
-                                           `(error "AWP run-time error in ~a (~a)"
-                                                   awp-file-path condition))
-                                         ((nil :ignore-and-log-to-syslog)
-                                           `(progn
-                                              (aw-log () "AWP run-time error in ~a (~a)"
-                                                         awp-file-path condition)
-                                              (err-and-linger 500 "AWP run-time error. See syslog.")))
-                                         ((:ignore-and-log-to-syslog+browser)
-                                           `(progn
-                                              (aw-log () "AWP run-time error in ~a (~a)"
-                                                         awp-file-path condition)
-                                              (err-and-linger 500 (format nil "AWP run-time error in ~a <br><br> (~a)"
-                                                                              awp-file-path condition))))
-                                         (t
-                                           (error "Unknown :awp-failure-reaction parameter: ~a"
-                                                  (xconf-get handler :awp-failure-reaction)))))))
+             (with-awp-error-handler "run-time"
                (when (eq http-method 'post)
                  (let ((post-len (parse-integer $h-content-length)))
                    (if (zerop post-len)

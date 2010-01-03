@@ -67,6 +67,30 @@ body,h1 { margin:10px; font-family: Verdana, Arial, sans-serif; }
   :awp-phase
     (if (xconf-get handler :awp)
       `(when-match (,(list-of-file-extensions-to-regex-with-path-info '(awp)) http-path)
+        (macrolet ((with-awp-error-handler (awp-exec-phase &rest body)
+                     (let ((my-handler ',(case (xconf-get handler :awp-failure-reaction)
+                                           ((:die)
+                                             `(error "AWP ~a error in ~a (~a)"
+                                                     awp-exec-phase awp-file-path condition))
+                                           ((nil :ignore-and-log-to-syslog)
+                                             `(progn
+                                                (aw-log () "AWP ~a error in ~a (~a)"
+                                                           awp-exec-phase awp-file-path condition)
+                                                (err-and-linger 500 (format nil "AWP error. See syslog."))))
+                                           ((:ignore-and-log-to-syslog+browser)
+                                             `(progn
+                                                (aw-log () "AWP ~a error in ~a (~a)"
+                                                           awp-exec-phase awp-file-path condition)
+                                                (err-and-linger 500 (format nil "AWP ~a error in ~a <br><br> (~a)"
+                                                                                awp-exec-phase awp-file-path condition))))
+                                           (t
+                                             (error "Unknown :awp-failure-reaction parameter: ~a"
+                                                    (xconf-get handler :awp-failure-reaction))))))
+                       `
+                          (handler-bind ((error (lambda (condition)
+                                                  (let ((awp-exec-phase ,awp-exec-phase))
+                                                    ,my-handler))))
+                            ,@body))))
          (setq http-path $1)
          (setq $u-path-info $2)
          (let* ((real-path ,(http-root-translate handler 'http-path))
@@ -157,7 +181,7 @@ body,h1 { margin:10px; font-family: Verdana, Arial, sans-serif; }
                                 )))
                        (when (stringp res)
                          (send-raw res)
-                         (keepalive))))))))))))
+                         (keepalive)))))))))))))
 
 
 (antiweb-module mod-cgi

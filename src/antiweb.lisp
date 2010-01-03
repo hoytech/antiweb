@@ -20,6 +20,25 @@
     (aw_fatal fstr)))
 
 
+(defmacro! post-unwind-handler-bind (handlers &rest body)
+  `(let (,g!clause ,g!condition ,g!ret)
+     (block ,g!block
+       (setq ,g!ret
+         (handler-bind ,(mapcar (lambda (handler)
+                                  `(,(car handler) (lambda (condition)
+                                                     (setq ,g!condition condition)
+                                                     (setq ,g!clause ',(car handler))
+                                                     (return-from ,g!block))))
+                                handlers)
+           ,@body)))
+     (if ,g!clause
+       (ecase ,g!clause
+         ,@(mapcar (lambda (handler)
+                     `((,(car handler)) (,(cadr handler) ,g!condition)))
+                   handlers))
+       ,g!ret)))
+
+
 (cffi:defcfun ("getpid" aw-getpid) :int)
 (cffi:defcfun ("getuid" aw-getuid) :int)
 (cffi:defcfun ("getgid" aw-getgid) :int)
@@ -956,16 +975,10 @@
     (cffi:with-foreign-slots ((ready) c conn)
       (read-from-conn-into-string c shared-input-buffer ready)
       (aw_drop_n_input_bytes c ready)
-      (let (fatal-condition)
-        (or
-          (ignore-errors
-            (handler-bind ((error (lambda (condition)
-                                    (setq fatal-condition condition))))
-              (incf worker-stats-total-requests)
-              (http-user-dispatch worker-http c shared-input-buffer)))
-          (if fatal-condition
-            (fatal "error in http user dispatch: ~a" fatal-condition)
-            'rolled-back-http-user-dispatch))))))
+      (post-unwind-handler-bind ((error (lambda (condition)
+                                          (fatal "error in http user dispatch: ~a" condition))))
+        (incf worker-stats-total-requests)
+        (http-user-dispatch worker-http c shared-input-buffer)))))
 
 
 
@@ -1382,8 +1395,8 @@
 (defun run-hub (hub-dir &optional nodaemon)
   ;; Privileged
   (do-aw-init (not nodaemon))
-  (handler-bind ((error (lambda (condition)
-                          (fatal "run-hub: startup: ~a" condition))))
+  (post-unwind-handler-bind ((error (lambda (condition)
+                                      (fatal "run-hub: startup: ~a" condition))))
     (setf aw-hub-dir hub-dir)
     (let (*read-eval*)
       (setf aw-hub-conf (load-conf-from-file (format nil "~a/hub.conf" aw-hub-dir))))
@@ -1426,8 +1439,8 @@
       (aw_set_nproc 1)))
 
   ;; Unprivileged
-  (handler-bind ((error (lambda (condition)
-                          (fatal "run-hub: running: ~a" condition))))
+  (post-unwind-handler-bind ((error (lambda (condition)
+                                      (fatal "run-hub: running: ~a" condition))))
     (format t "Hub started. Entering event-loop...~%")
     (event-loop)))
 
@@ -1437,8 +1450,8 @@
 (defun run-logger (hub-dir &optional nodaemon)
   ;; Privileged
   (do-aw-init (not nodaemon))
-  (handler-bind ((error (lambda (condition)
-                          (fatal "run-logger: startup: ~a" condition))))
+  (post-unwind-handler-bind ((error (lambda (condition)
+                                      (fatal "run-logger: startup: ~a" condition))))
     (setf aw-hub-dir hub-dir)
     (let (*read-eval*)
       (setf aw-hub-conf (load-conf-from-file (format nil "~a/hub.conf" aw-hub-dir))))
@@ -1472,8 +1485,8 @@
       (aw_set_nproc 1)))
 
   ;; Unprivileged
-  (handler-bind ((error (lambda (condition)
-                          (fatal "logger process: ~a" condition))))
+  (post-unwind-handler-bind ((error (lambda (condition)
+                                      (fatal "logger process: ~a" condition))))
     (format t "Logger started. Entering event-loop...~%")
     (event-loop)))
 
@@ -1554,8 +1567,8 @@
   (sleep 1/10) ; give hub a chance to start if launched simultaneously
   ;; Privileged
   (do-aw-init (not nodaemon))
-  (handler-bind ((error (lambda (condition)
-                          (fatal "run-worker: startup: ~a" condition))))
+  (post-unwind-handler-bind ((error (lambda (condition)
+                                      (fatal "run-worker: startup: ~a" condition))))
     (let (*read-eval*)
       (setf aw-worker-conf (load-conf-from-file filename)))
     (let ((name (conf-get aw-worker-conf 'worker)))
@@ -1582,12 +1595,12 @@
         (aw-bdb-init-environment bdb-dir))))
 
   ;; Unprivileged
-  (handler-bind ((error (lambda (condition)
-                          (fatal "install-worker-conf: ~a" condition))))
+  (post-unwind-handler-bind ((error (lambda (condition)
+                                      (fatal "install-worker-conf: ~a" condition))))
     (install-worker-conf))
 
-  (handler-bind ((error (lambda (condition)
-                          (fatal "run-worker: running: ~a" condition))))
+  (post-unwind-handler-bind ((error (lambda (condition)
+                                      (fatal "run-worker: running: ~a" condition))))
     (format t "Worker started. Entering event-loop...~%")
     (event-loop)))
 
@@ -1639,8 +1652,8 @@
 (defun run-supervise-hub (dir &optional cmd-str one-shot)
   (do-aw-init nil)
   (unwind-protect
-    (handler-bind ((error (lambda (condition)
-                            (fatal "run-supervise-hub: ~a" condition))))
+    (post-unwind-handler-bind ((error (lambda (condition)
+                                        (fatal "run-supervise-hub: ~a" condition))))
       (setf aw-hub-dir dir)
       (let (*read-eval*)
         (setf aw-hub-conf (load-conf-from-file (format nil "~a/hub.conf" aw-hub-dir))))
@@ -1651,8 +1664,8 @@
 (defun run-supervise-worker (filename &optional cmd-str one-shot)
   (do-aw-init nil)
   (unwind-protect
-    (handler-bind ((error (lambda (condition)
-                            (fatal "run-supervise-worker: ~a" condition))))
+    (post-unwind-handler-bind ((error (lambda (condition)
+                                        (fatal "run-supervise-worker: ~a" condition))))
       (let (*read-eval*)
         (setf aw-worker-conf (load-conf-from-file filename)))
       (setf aw-hub-dir (conf-get aw-worker-conf 'hub-dir))
@@ -1662,8 +1675,8 @@
 (defun run-reload-worker-conf (filename)
   (do-aw-init nil)
   (unwind-protect
-    (handler-bind ((error (lambda (condition)
-                            (fatal "run-reload-worker-conf: ~a" condition))))
+    (post-unwind-handler-bind ((error (lambda (condition)
+                                        (fatal "run-reload-worker-conf: ~a" condition))))
       (let (*read-eval*)
         (setf aw-worker-conf (load-conf-from-file filename)))
       (setf aw-hub-dir (conf-get aw-worker-conf 'hub-dir))
@@ -1678,8 +1691,8 @@
 (defun run-add-listener (hubdir bind-addr port)
   (do-aw-init nil)
   (unwind-protect
-    (handler-bind ((error (lambda (condition)
-                            (fatal "run-add-listener: ~a" condition))))
+    (post-unwind-handler-bind ((error (lambda (condition)
+                                        (fatal "run-add-listener: ~a" condition))))
       (setf aw-hub-dir hubdir)
       (let ((iconn (cffi:with-foreign-string (fstr bind-addr)
                      (aw_listen_inet fstr port)))

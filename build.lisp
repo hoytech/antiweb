@@ -159,7 +159,6 @@ int main() {
 (defvar all-antiweb-modules nil)
 (defvar aw-fast-files-table (make-hash-table :test #'equal))
 (defvar aw-start-time)
-(defvar aw-rollbacks nil)
 
 (defvar hub-stats-total-conns 0)
 (defvar hub-stats-dispatched-conns 0)

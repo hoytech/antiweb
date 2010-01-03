@@ -17,6 +17,8 @@
   because of an AWP error.
 * Change: The default value for :awp-failure-reaction used to be
   the equivalent of :die. Now it is :ignore-and-log-to-syslog.
+* Change: The config file rollback features have been removed. They
+  were making fine grained error handling more complicated.
 
 
 4.0BETA15   Sep 12, 2009

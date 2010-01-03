@@ -53,45 +53,9 @@
 
 
 
-
-
-
-(defstruct rollback
-  conf dispatch time comment)
-
-(defun push-rollback (&optional (comment "no comment"))
-  (push (make-rollback :conf aw-worker-conf
-                       :dispatch (symbol-function 'http-user-dispatch)
-                       :time (get-internal-real-time)
-                       :comment comment)
-        aw-rollbacks)
-  (format nil #"pushed ~a"# (describe-rollback (car aw-rollbacks))))
-
-(defun pop-rollback ()
-  (if aw-rollbacks
-    (pop aw-rollbacks)
-    (error "no rollback to pop")))
-
-(defun describe-rollback (rb)
-  (format nil #"rollback [~a] created ~a ago"# (rollback-comment rb) (calculate-uptime (rollback-time rb))))
-
-(defun rollback (&optional condition)
-  (unless aw-rollbacks (error "no rollbacks available"))
-  (let ((rb (pop-rollback)))
-    (setq aw-worker-conf (rollback-conf rb))
-    (setf (symbol-function 'http-user-dispatch) (rollback-dispatch rb))
-    (aw-log () #"ROLLBACK: ~a (~a)"# (describe-rollback rb) (or condition "manual rollback"))
-    (format nil #"installed ~a (~a)"# (describe-rollback rb) (or condition "manual rollback"))))
-
-(defun pop-all-rollbacks ()
-  (prog1 aw-rollbacks (setq aw-rollbacks nil)))
-
 (defun flush-fast-files ()
   (setf aw-fast-files-table (make-hash-table :test #'equal))
   'ok)
-
-
-
 
 
 
@@ -996,11 +960,7 @@
         (or
           (ignore-errors
             (handler-bind ((error (lambda (condition)
-                                    (if aw-rollbacks
-                                      (progn
-                                        (rollback condition)
-                                        (send-http-err-and-linger c 500 "http-user-dispatch rollback. see syslog"))
-                                      (setq fatal-condition condition)))))
+                                    (setq fatal-condition condition))))
               (incf worker-stats-total-requests)
               (http-user-dispatch worker-http c shared-input-buffer)))
           (if fatal-condition
@@ -1561,9 +1521,7 @@
 
 (defun reload-worker-conf (tp-worker-conf)
   (flush-fast-files)
-  (push-rollback "original")
   (handler-bind ((error (lambda (condition)
-                          (pop-rollback)
                           (aw-log () "problem reloading worker conf: ~a. Ignoring reload request" condition)
                           (return-from reload-worker-conf nil))))
     (unless (equal (conf-get aw-worker-conf 'worker) (conf-get tp-worker-conf 'worker)) (error "worker name changed"))
@@ -1587,8 +1545,6 @@
            (to-reg (set-difference new-hosts orig-hosts :test #'equalp))
            (update-str (format nil "~{unregister-host ~a~%~}~{register-host ~a~%~}lock~%" to-unreg to-reg)))
       (write-to-conn-from-string hub_conn update-str)))
-  (if (> (length aw-rollbacks) 1)
-    (pop-rollback)) ; when reloading, only keep rollback if there are no previous rollbacks
   (setf aw-worker-conf tp-worker-conf)
   (aw-log () "reloaded worker conf")
   'ok)
@@ -1797,12 +1753,6 @@
                                                                          (/ worker-stats-total-requests
                                                                             worker-stats-total-conns))))
       (format o #"~a"# (worker-connection-count-break-down))
-      (format o #"Rollbacks:~%"#)
-      (if aw-rollbacks
-        (dolist (rb aw-rollbacks)
-          (format o #"  Rollback '~a' pushed ~a ago~%"#
-                    (rollback-comment rb) (calculate-uptime (rollback-time rb))))
-        (format o #"  None~%"#))
       (format o #"Host -> HTML root mappings:~%"#)
       (loop for handler in (conf-get-all aw-worker-conf 'handler) do
         (loop for vhost in (xconf-get handler :hosts) do

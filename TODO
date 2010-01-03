@@ -27,7 +27,6 @@ fast-files should handle etags if enabled
 easy way to check if file/directory exists in :rewrite rules, like -f in apache rewrite
 
 ?? throttling
-?? rollbacks should capture current HTTP modules too
 ?? -kill should log
 ?? -kill should say "OK" - would need to be special cased cause process can't send back confirmation (it has been killed)
 ?? check owner/group of cache directory - (will fatal() on write anyways, why die if you have a bad cache you're NOT USING?)

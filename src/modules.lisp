@@ -122,6 +122,7 @@ body,h1 { margin:10px; font-family: Verdana, Arial, sans-serif; }
                      (return-from http-user-dispatch-macro
                        (read-fixed-length-message-from-conn-and-store-in-shared-input-buffer post-len
                          (block http-user-dispatch-macro
+                          (with-awp-error-handler "run-time"
                            (let ((post-handlers (awp-page-post-handlers (gethash awp-file-path awp-loaded-pages))))
                              (dolist (ph post-handlers)
                                (let ((res (funcall ph $u-path-info
@@ -130,7 +131,7 @@ body,h1 { margin:10px; font-family: Verdana, Arial, sans-serif; }
                                                    :args shared-input-buffer)))
                                  (when (stringp res)
                                    (send-raw res)
-                                   (keepalive)))))
+                                   (keepalive))))))
                            (err-and-linger 405 "Unhandled POST to AWP file")))))))
                (when (eq http-method 'get)
                  (let ((get-handlers (awp-page-get-handlers (gethash awp-file-path awp-loaded-pages))))

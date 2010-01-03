@@ -227,7 +227,7 @@ conns and ioblocks:
           (ul
             #"Accept new connections over its unix socket, which may either be connecting worker processes or supervisor connections."#
             #"Accept HTTP connections from the internet, decide based on the requested virtual host (vhost) which worker the connection applies to, then send the already read data from the connection along with the socket itself over the unix socket to the worker. This process closes the socket in the hub process so it is only open in the worker."#
-            #"Accept all log messages from worker processes and append them to the log files."#
+            #"Accept all log messages from worker processes and forward them to the logger process."#
             #"Route inter-process messages (such as supervisor connections)."#
           )
           #"Some other details about the hub:"#

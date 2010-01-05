@@ -86,8 +86,7 @@ body,h1 { margin:10px; font-family: Verdana, Arial, sans-serif; }
                                            (t
                                              (error "Unknown :awp-failure-reaction parameter: ~a"
                                                     (xconf-get handler :awp-failure-reaction))))))
-                       `
-                          (handler-bind ((error (lambda (condition)
+                       `(handler-bind ((error (lambda (condition)
                                                   (let ((awp-exec-phase ,awp-exec-phase))
                                                     ,my-handler))))
                             ,@body))))

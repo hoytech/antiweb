@@ -8,6 +8,8 @@
   installed version of antiweb. If an option is passed to -version,
   it will also connect to a worker or hub and determine the antiweb
   version that process is actually running.
+* Feature: awp-form-validation macro for back-end validation of AJAX
+  forms embedded into AWP pages.
 * Feature: Improved output of syslog entries when a worker dies
   because of an AWP error.
 * Feature: :awp-failure-reaction xconf option to handlers in worker

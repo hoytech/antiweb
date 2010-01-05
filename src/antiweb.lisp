@@ -1355,6 +1355,30 @@
      ,@body))
 
 
+(defmacro! awp-form-validation (&rest body)
+  `(let ((,g!assertions-needing-checkpoints 0)
+         ,g!error-messages)
+     (macrolet ((awp-form-assert (err-msg test)
+                  `(progn
+                     (incf ,',g!assertions-needing-checkpoints)
+                     (unless ,test
+                       (push ,err-msg ,',g!error-messages))))
+                (awp-form-checkpoint ()
+                  `(progn
+                     (if ,',g!error-messages
+                       (return (build-http-response 200 (("Content-Type" "text/plain"))
+                                 (format nil "ERROR~%~{~a~%~}" (nreverse ,',g!error-messages)))))
+                     (setf ,',g!assertions-needing-checkpoints 0))))
+       (multiple-value-bind (flag string-to-send-to-client) (progn ,@body)
+         (declare (ignore flag))
+         (unless (zerop ,g!assertions-needing-checkpoints)
+           (error "~a assertions weren't checkpointed" ,g!assertions-needing-checkpoints))
+         (build-http-response 200 (("Content-Type" "text/plain"))
+           (format nil "OK~%~a" (if (stringp string-to-send-to-client)
+                                  string-to-send-to-client
+                                  "")))))))
+
+
 
 (defconstant names-of-the-months
   #(nil "January" "February" "March" "April" "May" "June" "July" "August"

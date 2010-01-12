@@ -614,7 +614,7 @@ http {
       (ccl-limitations #"Are there any known limitations with ClozureCL?"#
         #"None currently known."#
       )
-      (sbcl #"Is SBCL supported?"# #"Currently no. #(link "http://www.sbcl.org" "SBCL") is an <b>experimental fork</b> of CMUCL. We have had problems with several versions of SBCL in the past, but eventually Antiweb will probably run on SBCL. If you port Antiweb to SBCL, we recommend building a single-threaded lisp image."#
+      (sbcl #"Is SBCL supported?"# #"Currently no. There are likely only some minor porting issues involved. If you port Antiweb to SBCL, we recommend building a single-threaded lisp image."#
       )
       (skillz #"Can you teach me l33t k0ding skillz?"# #"Yes, yes we can. Please refer to Doug Hoyte's book #(link "http://letoverlambda.com" "Let Over Lambda") for details on many of the coding techniques used in Antiweb4."#)
     )
@@ -686,8 +686,8 @@ Every worker process must have a worker conf file. See the #(link "install.html"
       #"http-path - The decoded path portion of the URL. This will always begin with a / character. This will include the path-info portion of the path."#
       #"http-args - The URL encoded URL arguments (portion of URL after the ? character, not including the ?)."#
       #"http-host - The lowercase version of the virtual host requested by the client."#
-      #"$u-anything-you-like - These are #(link "http://letoverlambda.com" "magic") variables. You can use them for anything, including sharing values between rewrite rules or other Antiweb modules. They are initially bound to nil."#
-      #"$h-any-http-header - These are extra-magic variables. You can use them to access any HTTP header. To be honest, they are regular expressions. $h-referr?er will contain the contents of a Referer or Referrer header line (whichever appears first)."#
+      #"$u-anything-you-like - These are #(link "http://letoverlambda.com" "sub-lexical") variables. You can use them for anything, including sharing values between rewrite rules or other Antiweb modules. They are initially bound to nil."#
+      #"$h-any-http-header - These are also sub-lexical variables. You can use them to access any HTTP header. To be honest, they are regular expressions. $h-referr?er will contain the contents of a Referer or Referrer header line (whichever appears first)."#
   )
   #"The form <b>add-header-to-response</b> adds an HTTP header to any successful response:"#
   (pre #"

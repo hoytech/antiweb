@@ -89,7 +89,7 @@ span.tip {
 }
 "#
 
-  :logo #"<img src="http://hoytech.com/antiweb/antiweb.png">"#
+  :logo #"<a href="http://hoytech.com/antiweb/"><img border=0 src="http://hoytech.com/antiweb/antiweb.png"></a>"#
   :content (p
 #"This is the official manual for the #(link "http://hoytech.com/antiweb/" "Antiweb") webserver. We take documentation seriously. If you have questions that aren't answered in the docs, that is a bug. Please #(link "http://groups.google.com/group/antiweb" "report it to us") so we can answer your question and improve the manual."#
 #"Which section of the manual you should read depends on your interest in Antiweb:"#

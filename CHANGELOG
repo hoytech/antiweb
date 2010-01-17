@@ -1,4 +1,4 @@
-4.0BETA16
+4.0BETA16   Jan 17, 2010
 
 * Bugfix: Prevent CMUCL from printing annoying Reloaded library
   "libantiweb32.so" message on start-up.

@@ -21,6 +21,8 @@
   the equivalent of :die. Now it is :ignore-and-log-to-syslog.
 * Change: The config file rollback features have been removed. They
   were making fine grained error handling more complicated.
+* Change: The hub no longer tries to start multiple times if it
+  can't start initially.
 * Change: New macro post-unwind-handler-bind. It is used the same
   way as handler-bind, except that the stack will be unwound before
   the handlers are executed. This means you cannot restart from

@@ -358,20 +358,18 @@ sub exec_lisp {
   my $expr = shift;
 
   if ($cl_sys eq "cmu") {
-    system("$cmu_exec -quiet -core '$lib_dir/antiweb.cmu.image' -eval '$expr'")
-      && "Couldn't exec CMUCL at $cmu_exec";
+    exec("$cmu_exec -quiet -core '$lib_dir/antiweb.cmu.image' -eval '$expr'");
+    die "Couldn't exec CMUCL program '$cmu_exec'";
   } elsif ($cl_sys eq "clisp") {
     my $q="";
     $q = "cat | " if $noreadline;
-    system("$q $clisp_exec -q -repl -M '$lib_dir/antiweb.clisp.image' -x '$expr'")
-      && die "Couldn't exec CLISP at $clisp_exec";
+    exec("$q $clisp_exec -q -repl -M '$lib_dir/antiweb.clisp.image' -x '$expr'");
+    die "Couldn't exec CLISP program '$clisp_exec'";
   } elsif ($cl_sys eq "ccl") {
-    system("$ccl_exec -Q -I '$lib_dir/antiweb.ccl.image' -e '$expr'")
-      && die "Couldn't exec ClozureCL at $ccl_exec";
-  } else {
-    die "Unknown cl_sys: $cl_sys";
+    exec("$ccl_exec -Q -I '$lib_dir/antiweb.ccl.image' -e '$expr'");
+    die "Couldn't exec ClozureCL program '$ccl_exec'";
   }
-  exit;
+  die "Unknown cl_sys: $cl_sys";
 }
 
 sub attempt_connection_to_unix_socket {
@@ -407,27 +405,45 @@ if ($switch eq "-hub") {
     exit(-1);
   }
 
-  my $relaunch_attempts = 5;
-  my $relaunch_delay = 0.1;
+  my $rv = fork();
+  die "couldn't fork: $!" unless defined $rv;
 
-  for (; $relaunch_attempts>=0; $relaunch_attempts--) {
-    my $rv = fork();
-    die "couldn't fork: $!" unless defined $rv;
+  if ($nodaemon) {
+    # When nodaemon mode is on, the hub process runs in the foreground
+    # but the logger process runs in the background. To do this, a child
+    # process is started before the hub process which waits a short amount
+    # of time and then launches the logger process
+
     if ($rv == 0) {
-      exec_lisp("(run-hub \"$arg\" t)") if $nodaemon;
-      exec_lisp("(run-hub \"$arg\")");
-    } else {
-      my_sleep($relaunch_delay);
-      if (attempt_connection_to_unix_socket("$arg/hub.socket")) {
-        exec_lisp("(run-logger \"$arg\" t)") if $nodaemon;
+      my_sleep(0.5);
+
+      my $rv = fork();
+      die "couldn't fork: $!" unless defined $rv;
+
+      if ($rv) {
+        waitpid($rv, 0);
+        print "WARNING: Unable to start logger process\n" if $?;
+        exit;
+      } else {
         exec_lisp("(run-logger \"$arg\")");
       }
-      print STDERR "LOGGER: Unable to connect to hub. Retrying $relaunch_attempts more times...\n" if $relaunch_attempts;
-      $relaunch_delay *= 2;
     }
+
+    exec_lisp("(run-hub \"$arg\" t)");
+  } else {
+    # In regular operation, a child process is forked which launches the hub
+    # in the background. If it exits successfully, the logger process is also
+    # launched in the background.
+
+    if ($rv == 0) {
+      exec_lisp("(run-hub \"$arg\")");
+    }
+
+    waitpid($rv, 0);
+    exec_lisp("(run-logger \"$arg\")") unless $?;
   }
 
-  print STDERR "LOGGER: Gave up trying to connect to hub.\n";
+  print STDERR "*** Failed to start Antiweb ***\n";
   exit(-1);
 } elsif ($switch eq "-worker") {
   my $arg = shift or usage();

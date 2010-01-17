@@ -144,7 +144,7 @@ span.tip {
         #"The HTTP headers for the medium file"#
         #"As much of the memory mapped medium file as it takes to fill the kernel's socket buffer."#
       )
-      #"Subsequently, all the generated log messages are written to the hub process with another writev(). The hub will eventually append the log messages (as well as any others that queue up) onto the <b>axslog</b> log file."#
+      #"Subsequently, all the generated log messages are written to the hub process with writev(). The hub will forward the log messages to the logger process with another writev(). Finally, the logger process will append the messages onto the <b>axslog</b> file."#
       #"To see the connection statistics of a worker process, use the #(link "faq.html#STATS" "-stats") command:"#
 (pre #"# antiweb -stats /var/aw/example.conf
 ...

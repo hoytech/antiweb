@@ -94,7 +94,7 @@ void aw_log(char *file, char *prefix, char *log_msg) {
   size_t len, plen, mlen;
 
   if (logger_conn == NULL) {
-    fprintf(STDERR, "%s%s\n", prefix, log_msg);
+    fprintf(stderr, "%s%s\n", prefix, log_msg);
     return;
   }
 

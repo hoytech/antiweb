@@ -1661,10 +1661,12 @@
                             shared-input-buffer
                             (if transfer "worker " "HUB")
                             (or transfer ""))
-                (let* ((v (with-lenient-struct-reader (read t)))
+                (let* ((eof-val (cons 0 0))
+                       (v (with-lenient-struct-reader (read t nil eof-val)))
                        (s (let ((*print-circle* t))
                             (format nil "~S" v))))
-                  (if (equal v '(quit)) (quit))
+                  (if (or (eq v eof-val)
+                          (equal v '(quit))) (quit))
                   (write-to-conn-from-string c
                     (format nil "eval ~a~%~a" (length s) s)))
                 (aw_update_conn_ready_status c)

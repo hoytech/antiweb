@@ -37,7 +37,7 @@
 
 
 
-(defmacro plz-stfu (&rest body)
+(defmacro redirect-standard-output-to-dev-null (&rest body)
   (if aw-debugging
     `(progn ,@body)
     `(with-open-file (*standard-output* "/dev/null" :direction :output :if-exists :append)
@@ -47,24 +47,24 @@
 #+clisp (setq *compile-verbose* nil)
 
 (format t "BUILD: Compiling and loading CL-PPCRE by Edi Weitz (please be patient)~%")
-(plz-stfu (load "bundled/cl-ppcre/load.lisp"))
+(redirect-standard-output-to-dev-null (load "bundled/cl-ppcre/load.lisp"))
 (setf cl-ppcre:*regex-char-code-limit* 256)
 (setf cl-ppcre:*use-bmh-matchers* nil)
 
 (format t "BUILD: Compiling and loading CFFI by James Bielman (please be patient)~%")
-(plz-stfu (load "bundled/cffi/load.lisp"))
+(redirect-standard-output-to-dev-null (load "bundled/cffi/load.lisp"))
 
 (format t "BUILD: Compiling and loading Let Over Lambda, Antiweb production edition~%")
-(plz-stfu
+(redirect-standard-output-to-dev-null
   (load "bundled/lol.lisp") ; Need to load before compiling because it uses its own read macros
   (load (compile-file "bundled/lol.lisp")))
 
 (format t "BUILD: Compiling and loading ISAAC random number generator~%")
-(plz-stfu
+(redirect-standard-output-to-dev-null
   (load (compile-file "bundled/isaac.lisp")))
 
 (format t "BUILD: Compiling and loading jsmin.lisp by Ury Marshak~%")
-(plz-stfu
+(redirect-standard-output-to-dev-null
   (load (compile-file "bundled/jsmin.lisp")))
 
 

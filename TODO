@@ -1,3 +1,9 @@
+# ./antiweb -hub /home/doug/antiweb/bin/junk-hub/
+FATAL: run-logger: startup: aw_log directory isn't owned by logger-uid (23001)
+... but hub is still running. should probably stop hub as well
+
+
+
 Sec:
 
 !! limit on # conns from same ip (per worker? per worker AND in the hub? relevant at all for ipv6?)

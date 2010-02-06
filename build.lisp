@@ -38,11 +38,17 @@
 
 
 (defmacro redirect-standard-output-to-dev-null (&rest body)
-  (if aw-debugging
-    `(progn ,@body)
-    `(with-open-file (*standard-output* "/dev/null" :direction :output :if-exists :append)
-       (let ((*error-output* *standard-output*))
-         ,@body))))
+  `(let ((out *standard-output*))
+     (ignore-errors
+       (handler-bind ((error (lambda (c)
+                                (format out "~%There was an ERROR building a bundled dependency:~2%")
+                                (format out "~a~2%" c)
+                                (format out "Trying to proceed anyways...~2%"))))
+            ,(if aw-debugging
+               `(progn ,@body)
+               `(with-open-file (*standard-output* "/dev/null" :direction :output :if-exists :append)
+                  (let ((*error-output* *standard-output*))
+                    ,@body)))))))
 
 #+clisp (setq *compile-verbose* nil)
 

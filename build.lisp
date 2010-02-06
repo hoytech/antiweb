@@ -284,7 +284,9 @@ int main() {
 
   (format o #"my $cl_sys = "~a";~%"# #+cmu "cmu" #+clisp "clisp" #+ccl "ccl")
 
+  (format o #"my $bin_dir = "~a";~%"# aw-bin-dir)
   (format o #"my $lib_dir = "~a";~%"# aw-lib-dir)
+  (format o #"my $bits = ~a;~%"# aw-bits)
 
   (format o #"my $AW_VERSION = "~a";~%"# AW_VERSION)
 
@@ -518,11 +520,21 @@ if ($switch eq "-hub") {
   }
   die "not a hub directory or worker conf file: $arg";
 } elsif ($switch eq "-version") {
-  print "System's installed Antiweb version: $AW_VERSION\n\n";
+  print "CURRENT INSTALLATION ON THIS SYSTEM:\n";
+  print "    Antiweb version: $AW_VERSION\n";
+  print "    Antiweb launch script: $bin_dir/antiweb\n";
+  print "    Antiweb library: $lib_dir/libantiweb$bits.so\n";
+  print "    Default lisp environment: $cl_sys\n";
+  print "    Lisp binary: ";
+  print $cmu_exec if $cl_sys eq "cmu";
+  print $clisp_exec if $cl_sys eq "clisp";
+  print $ccl_exec if $cl_sys eq "ccl";
+  print "\n";
+  print "\n";
   my $arg = shift;
   if (!$arg) {
-    print "  Provide either a hub directory or a worker conf file as an argument to\n";
-    print "  -version to see what version the specified hub or worker process is running.\n";
+    print "Provide either a hub directory or a worker conf file as an argument to\n";
+    print "-version to see what version the specified hub or worker process is running.\n\n";
     exit;
   }
   die "Path to hubdir/worker conf must be absolute" unless $arg =~ m|^/|;

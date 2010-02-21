@@ -477,6 +477,7 @@ In other words:
       (values t t)
       (values nil nil)))
 
+#+nil ; Code removed for antiweb so we don't need cl-fad dependency
 (defun reread-timezone-repository (&key (timezone-repository *default-timezone-repository-path*))
   (check-type timezone-repository (or pathname string))
   (multiple-value-bind (valid? error)

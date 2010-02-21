@@ -73,6 +73,10 @@
 (redirect-standard-output-to-dev-null
   (load (compile-file "bundled/jsmin.lisp")))
 
+(format t "BUILD: Compiling and loading local-time by Daniel Lowe~%")
+(redirect-standard-output-to-dev-null
+  (load (compile-file "bundled/local-time.lisp")))
+
 
 
 (cffi:defcfun ("system" silent-system) :int (command :string))

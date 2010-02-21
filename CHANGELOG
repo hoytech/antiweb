@@ -1,3 +1,15 @@
+4.0BETA17
+
+* Bugfix: Don't print error message when closing a connection to an
+  attached antiweb process with control-D.
+* Bugfix: Don't mask/mangle error message output if compiling or
+  loading a bundled dependency fails during build.
+* Feature: More information on current antiweb installation are
+  included in -version output.
+* Feature: Include Daniel Lowe's local-time library in the bundled/
+  software collection.
+
+
 4.0BETA16   Jan 17, 2010
 
 * Bugfix: Prevent CMUCL from printing annoying Reloaded library

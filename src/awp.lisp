@@ -150,7 +150,7 @@
             (if-match (#~m/^(.*){{{([\w-]+)}}}(.*)$/s html)
               (setq html (format nil "~a~a~a"
                                  $1
-                                 (or (xconf-get page-with-inherits (keyword-intern $2)) "")
+                                 (awp-super-glue (or (xconf-get page-with-inherits (keyword-intern $2)) ""))
                                  $3))
               (return)))
           (format o #"~a"# html)))

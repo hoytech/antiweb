@@ -4,6 +4,7 @@
   '(:doctype :title :css
     :pre-html
     :layout :layout-width
+    :html
     :post-html
     :js-extern :js-main))
 
@@ -142,6 +143,17 @@
                            page-with-inherits
                            (xconf-get page-with-inherits :layout-width)))
           (format o #"</div>"#)))
+
+      (let ((html (xconf-get page-with-inherits :html)))
+        (when html
+          (loop do
+            (if-match (#~m/^(.*){{{([\w-]+)}}}(.*)$/s html)
+              (setq html (format nil "~a~a~a"
+                                 $1
+                                 (or (xconf-get page-with-inherits (keyword-intern $2)) "")
+                                 $3))
+              (return)))
+          (format o #"~a"# html)))
 
       (let ((html (xconf-get-all page-with-inherits :post-html))) ; NOT reversed
         (format o #"~{~a~}"# (mapcar #'awp-super-glue html)))

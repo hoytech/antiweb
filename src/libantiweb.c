@@ -2674,7 +2674,7 @@ void aw_bdb_init_environment(char *dir) {
   int ret;
 
   db_version(&ret, NULL, NULL);
-  if (ret != 4) fatal("aw_bdb_init_environment: BerkeleyDB version 4 is required");
+  if (ret < 4) fatal("aw_bdb_init_environment: BerkeleyDB version 4+ is required");
 
   ret = db_env_create(&berkeleydb_env, 0);
   if (ret) fatal("aw_init_db: db_env_create: %s", db_strerror(ret));

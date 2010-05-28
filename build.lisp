@@ -77,6 +77,10 @@
 (redirect-standard-output-to-dev-null
   (load (compile-file "bundled/local-time.lisp")))
 
+(format t "BUILD: Compiling and loading yason~%")
+(redirect-standard-output-to-dev-null
+  (load "bundled/yason/load.lisp"))
+
 
 
 (cffi:defcfun ("system" silent-system) :int (command :string))

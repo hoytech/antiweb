@@ -52,12 +52,12 @@
 
 #+clisp (setq *compile-verbose* nil)
 
-(format t "BUILD: Compiling and loading CL-PPCRE by Edi Weitz (please be patient)~%")
+(format t "BUILD: Compiling and loading CL-PPCRE (please be patient)~%")
 (redirect-standard-output-to-dev-null (load "bundled/cl-ppcre/load.lisp"))
 (setf cl-ppcre:*regex-char-code-limit* 256)
 (setf cl-ppcre:*use-bmh-matchers* nil)
 
-(format t "BUILD: Compiling and loading CFFI by James Bielman (please be patient)~%")
+(format t "BUILD: Compiling and loading CFFI (please be patient)~%")
 (redirect-standard-output-to-dev-null (load "bundled/cffi/load.lisp"))
 
 (format t "BUILD: Compiling and loading Let Over Lambda, Antiweb production edition~%")
@@ -69,11 +69,11 @@
 (redirect-standard-output-to-dev-null
   (load (compile-file "bundled/isaac.lisp")))
 
-(format t "BUILD: Compiling and loading jsmin.lisp by Ury Marshak~%")
+(format t "BUILD: Compiling and loading jsmin.lisp~%")
 (redirect-standard-output-to-dev-null
   (load (compile-file "bundled/jsmin.lisp")))
 
-(format t "BUILD: Compiling and loading local-time by Daniel Lowe~%")
+(format t "BUILD: Compiling and loading local-time~%")
 (redirect-standard-output-to-dev-null
   (load (compile-file "bundled/local-time.lisp")))
 

@@ -12,6 +12,11 @@
   software collection.
 * Feature: New :html compile-time templating functionality for
   AWP pages.
+* Feature: In addition to the nil block, the AWP handler macros also
+  now wrap an :aw-handler block around the handlers so handlers can
+  either (return) or (return-from :aw-handler). This is useful if you
+  wish to return from inside a loop or other such form that installs
+  its own nil block.
 
 
 4.0BETA16   Jan 17, 2010

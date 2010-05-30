@@ -103,11 +103,12 @@
       (let ((g!http-path (gensym "http-path")))
         `(lambda (,g!http-path &key ,@args &allow-other-keys)
            (block nil
-             ,(if (stringp path)
-                `(when (string-equal ,path ,g!http-path)
-                   ,@body)
-                `(when-match (,path ,g!http-path)
-                   ,@body))))))))
+             (block :aw-handler
+               ,(if (stringp path)
+                  `(when (string-equal ,path ,g!http-path)
+                     ,@body)
+                  `(when-match (,path ,g!http-path)
+                     ,@body)))))))))
 
 
 (defun awp-compile-page (pages p filename)

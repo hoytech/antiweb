@@ -181,7 +181,7 @@ Host -> HTML root mappings:
     (ul
       #"Virtual hosts are privilege-separated <b>without proxying</b>. Once the hub has determined which worker should handle a connection, it transfers the socket to the worker process and has nothing further to do with the connection. Worker processes run under different UIDs from the hub (and each-other). Workers are optionally #(link "worker.html#CHROOT" "chroot()ed")."#
       #"Workers have no access to log files: all log messages are sent to the hub over the unix socket. The hub then subsequently sends them to the logger process. This means that a compromised worker process cannot steal previously created log messages or log messages created by other workers, and a compromised hub process cannot steal previously created log messages."#
-      #"#(link "design.html#CGI-PROCESSES" "CGI processes") can be restricted with resource limitations."#
+      #"#(link "design.html#CGI-PROCESS" "CGI processes") can be restricted with resource limitations."#
       #"Even on lisps without unicode support, Antiweb4 guarantees all internal data and filenames are #(link "design.html#UNICODE" "UTF-8") encoded. This includes verifying all code-points are in their shortest possible representation and that there are no otherwise invalid surrogates."#
       #"Antiweb processes never try to clean-up or recover in the event of an unexpected condition. A process cannot do that because it has #(link "faq.html#ERLANG" "failed"). Some other process that hasn't failed will clean-up after it."#
     )

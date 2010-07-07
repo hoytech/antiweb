@@ -456,7 +456,12 @@ if ($switch eq "-hub") {
     }
 
     waitpid($rv, 0);
-    exec_lisp("(run-logger \"$arg\")") unless $?;
+
+    if ($?) {
+      print STDERR "antiweb: Unable to start hub process: $?\n";
+    } else {
+      exec_lisp("(run-logger \"$arg\")") unless $?;
+    }
   }
 
   print STDERR "*** Failed to start Antiweb ***\n";

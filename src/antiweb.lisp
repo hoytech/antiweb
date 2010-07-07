@@ -291,11 +291,17 @@
       (values nil nil)
       (values (read-from-string str) t))))
 
+#-ccl
 (defsetf bdb-get (db-name &rest key-segs) (val)
   (let ((g!val (gensym "val")))
     `(let ((,g!val (format nil "~S" ,val)))
        (aw-bdb-lowlevel-put ,db-name (aw-bdb-key-segments-to-key (list ,@key-segs)) ,g!val)
        ,val)))
+
+#+ccl ; ClozureCL has broken defsetf (see trac ticket #436)
+(defun (setf bdb-get) (new-val db-name &rest key-segs)
+  (setq new-val (format nil "~S" new-val))
+  (aw-bdb-lowlevel-put db-name (aw-bdb-key-segments-to-key key-segs) new-val))
 
 ;; Returns t if the item was in the DB, nil otherwise (same as remhash)
 (defun bdb-del (db-name &rest key-segs)

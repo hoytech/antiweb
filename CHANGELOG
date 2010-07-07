@@ -6,6 +6,9 @@
   loading a bundled dependency fails during build.
 * Bugfix: If the hub process didn't daemonise cleanly, print out a
   warning containing the exit status code.
+* Bugfix: Work around ClozureCL's broken detsetf implementation which
+  was breaking the BerkeleyDB support. This work-around can be removed
+  when/if ClozureCL issue #436 is resolved.
 * Feature: More information on current antiweb installation are
   included in -version output.
 * Feature: Include Daniel Lowe's local-time library in the bundled/

@@ -402,6 +402,7 @@ Password:
           #"CLISP/Linux 2.6/x86"#
           #"CMUCL/FreeBSD 7.0/x86"#
           #"ClozureCL/Linux 2.6/x86-64"#
+          #"ClozureCL/FreeBSD 8/x86-64"#
         )
         #"#(link "http://www.fefe.de/nowindows/" "Please do not port Antiweb to proprietary unix or lisp environments")."#
       )
@@ -612,7 +613,9 @@ http {
         )
       )
       (ccl-limitations #"Are there any known limitations with ClozureCL?"#
-        #"None currently known."#
+        (ul
+          #"ClozureCL/Linux/x86 seems to have some issues with FFI and is not currently recommended."#
+        )
       )
       (sbcl #"Is SBCL supported?"# #"Currently no. There are likely only some minor porting issues involved. If you port Antiweb to SBCL, we recommend building a single-threaded lisp image."#
       )

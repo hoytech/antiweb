@@ -1,0 +1,5 @@
+Package: antiweb
+Version: {{VERSION}}
+Architecture: {{ARCH}}
+Maintainer: Doug Hoyte
+Description: Common Lisp web application server

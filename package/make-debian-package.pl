@@ -4,7 +4,7 @@ use strict;
 
 my $bits = length pack("l!")==8 ? 64 : 32;
 
-my $tag = `git describe --tags --match $product-\*`;
+my $tag = `git describe --tags --match antiweb-\*`;
 
 print "QQQ: $tag\n";
 

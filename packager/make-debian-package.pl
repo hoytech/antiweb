@@ -82,6 +82,13 @@ if ($os eq 'linux') {
 my $aw_version = `git describe --tags --match antiweb-\*`;
 chomp $aw_version;
 
+$aw_version =~ s/^antiweb-//;
+
+if ($aw_version =~ /^(.*-)(g[a-f]+)$/) {
+  # Work around dpkg lameness where it won't install a package unless the hashtag contains a digit
+  $aw_version = $1 . '0' . $2;
+}
+
 print <<END;
 
 OK, so far your setup looks good:
@@ -99,7 +106,7 @@ END
 if ($lisp eq 'cmucl') {
   die "cmucl unimplemented";
 } elsif ($lisp eq 'ccl') {
-  print "*** Please enter a path to a ClozureCL directory with a binary then press enter:\n";
+  print "\n*** Please enter a path to a ClozureCL directory then press enter:\n";
   my $path = <>;
   chomp $path;
 
@@ -123,7 +130,7 @@ if ($lisp eq 'cmucl') {
 ## COPY BERKELEYDB LIBRARY INTO PREFIX
 
 {
-  print "*** Please enter a path to a BerkeleyDB installation with a compiled library:\n";
+  print "\n*** Please enter a path to a compiled BerkeleyDB installation:\n";
   my $path = <>;
   chomp $path;
 
@@ -206,16 +213,22 @@ if ($lisp eq 'cmucl') {
 
 
 
-## ACTUALLY BUILD PACKAGE
-
-
-
 ## REMOVE TEMPORARY FILES
 
 sys("rm -rf $prefix");
 sys("rm ../local.lisp");
 
 
+
+## ACTUALLY BUILD PACKAGE
+
+my $deb_package_filename = "antiweb" . "_" . $aw_version . "_" . $arch . ".deb";
+
+sys("dpkg -b build/ $deb_package_filename");
+
+print "\n\nCongratulations, your debian package was created:\n\n$deb_package_filename\n\n";
+
+exit;
 
 
 

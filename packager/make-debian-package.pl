@@ -92,6 +92,9 @@ if ($lisp eq 'cmucl') {
   sys("cp $path/lx86cl64 $prefix/ccl/");
   sys("cp $path/lx86cl64.image $prefix/ccl/");
   sys("cp $path/scripts/ccl64 $prefix/ccl/");
+
+  # rewrite the ccl64 script to refer to our custom prefix
+  sys(qq{ /usr/bin/env perl -pi -e 's|\\s*CCL_DEFAULT_DIRECTORY=.*|  CCL_DEFAULT_DIRECTORY=$prefix/ccl|' $prefix/ccl/ccl64 });
 }
 
 

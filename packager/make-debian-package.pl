@@ -100,6 +100,23 @@ if ($lisp eq 'cmucl') {
 
 ## COPY BERKELEYDB LIBRARY INTO PREFIX
 
+{
+  print "*** Please enter a path to a BerkeleyDB installation with a compiled library:\n";
+  my $path = <>;
+  chomp $path;
+
+  die "path is not a directory: $path" unless -d $path;
+  die "unable to find db_recover utility at $path/bin/db_recover" unless -x "$path/bin/db_recover";
+  die "unable to find lib/ directory at $path/lib/" unless -d "$path/lib";
+  die "unable to find include/ directory at $path/include/" unless -d "$path/include";
+
+  sys("mkdir -p $prefix/bdb$bits/");
+
+  sys("cp -r $path/bin/ $prefix/bdb$bits/");
+  sys("cp -r $path/lib/ $prefix/bdb$bits/");
+  sys("cp -r $path/include/ $prefix/bdb$bits/");
+}
+
 
 
 ## FIND ANTIWEB VERSION

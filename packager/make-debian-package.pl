@@ -9,7 +9,9 @@ my $antiweb_lib_dir = '/usr/lib';
 sub usage {
   print STDERR <<END;
 Antiweb .deb packager script (C) Doug Hoyte
-usage: $0 <lisp> <architecture> <operating system>
+usage:
+  $0 clean
+  $0 <lisp> <architecture> <operating system>
 
 Valid lisp parameters:
   cmucl
@@ -30,6 +32,12 @@ END
 ## SCRIPT PARAMETERS
 
 my $lisp = shift || usage();
+
+if ($lisp eq 'clean') {
+  sys("rm -rf build/ *.deb");
+  exit;
+}
+
 my $arch = shift || usage();
 my $os = shift || usage();
 

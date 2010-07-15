@@ -87,11 +87,13 @@ if ($lisp eq 'cmucl') {
   die "unable to find binary at $path/lx86cl64" unless -x "$path/lx86cl64";
   die "unable to find lisp image at $path/lx86cl64.image" unless -e "$path/lx86cl64.image";
   die "unable to find launcher script at $path/scripts/ccl64" unless -x "$path/scripts/ccl64";
+  die "unable to find x86-headers64/ dir at $path/x86-headers64/" unless -d "$path/x86-headers64/";
 
   sys("mkdir -p $prefix/ccl/");
   sys("cp $path/lx86cl64 $prefix/ccl/");
   sys("cp $path/lx86cl64.image $prefix/ccl/");
   sys("cp $path/scripts/ccl64 $prefix/ccl/");
+  sys("cp -r $path/x86-headers64/ $prefix/ccl/");
 
   # rewrite the ccl64 script to refer to our custom prefix
   sys(qq{ /usr/bin/env perl -pi -e 's|\\s*CCL_DEFAULT_DIRECTORY=.*|  CCL_DEFAULT_DIRECTORY=$prefix/ccl|' $prefix/ccl/ccl64 });
@@ -124,6 +126,27 @@ if ($lisp eq 'cmucl') {
 my $aw_version = `git describe --tags --match antiweb-\*`;
 print "Antiweb version: $aw_version\n";
 
+
+
+## BUILD local.lisp ANTIWEB BUILD CONFIGURATION FILE
+
+if ($lisp eq 'cmucl') {
+  die "cmucl unimplemented";
+} elsif ($lisp eq 'ccl') {
+  open(FH, "> ../local.lisp");
+  print FH <<END;
+#+ccl
+(progn
+  (setq aw-ccl-executable "$prefix/ccl/ccl64")
+  (setq aw-use-bdb t)
+  (setq aw-extra-cflags "-L$prefix/bdb$bits/lib/ -I$prefix/bdb$bits/include/")
+)
+
+#-ccl 
+(error "this package was configured for ClozureCL")
+END
+  close(FH);
+}
 
 
 

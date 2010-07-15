@@ -3,3 +3,5 @@ Version: {{VERSION}}
 Architecture: {{ARCH}}
 Maintainer: Doug Hoyte
 Description: Common Lisp web application server
+Depends: perl,
+         zlib1g

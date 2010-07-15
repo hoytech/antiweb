@@ -31,6 +31,13 @@ my $arch = shift || usage();
 my $os = shift || usage();
 
 
+## SOME BASIC SANITY CHECKS
+
+die "This packager script must be run as root" if $<;
+die "Unable to find DEBIAN/ directory. Not in packager directory" unless -d 'DEBIAN';
+die "This antiweb repo has a ../local.lisp. Please back it up and remove it." if -e '../local.lisp';
+
+
 ## VERIFY SCRIPT PARAMETERS
 
 my $bits = length pack("l!")==8 ? 64 : 32;
@@ -70,10 +77,6 @@ my $aw_version = `git describe --tags --match antiweb-\*`;
 print "Antiweb version: $aw_version\n";
 
 
-## SOME BASIC SANITY CHECKS
-
-die "This antiweb repo has a ../local.lisp. Please back it up and remove it." if -e '../local.lisp';
-
 
 =pod
 if ($lisp eq 'cmucl') {
@@ -86,8 +89,6 @@ if ($lisp eq 'cmucl') {
 
 
 ## CONSTRUCT PACKAGE
-
-die "Unable to find DEBIAN/ directory" unless -d 'DEBIAN';
 
 sys("rm -rf build");
 sys("mkdir build");

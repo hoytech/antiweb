@@ -3,6 +3,8 @@
 use strict;
 
 my $prefix = '/usr/local/antiweb';
+my $antiweb_bin_dir = '/usr/bin';
+my $antiweb_lib_dir = '/usr/lib';
 
 sub usage {
   print STDERR <<END;
@@ -34,15 +36,17 @@ my $os = shift || usage();
 
 ## SOME BASIC SANITY CHECKS
 
+my $bits = length pack("l!")==8 ? 64 : 32;
+
 die "This packager script must be run as root" if $<;
 die "Unable to find DEBIAN/ directory. Not in packager directory" unless -d 'DEBIAN';
 die "This antiweb repo has a ../local.lisp. Please back it up and remove it." if -e '../local.lisp';
+die "This machine already seems to have an antiweb launch script at $antiweb_bin_dir/antiweb" if -x "$antiweb_bin_dir/antiweb";
+die "This machine already seems to have an antiweb library at $antiweb_lib_dir/libantiweb$bits.so" if -x "$antiweb_lib_dir/libantiweb$bits.so";
 die "This machine already seems to have an antiweb install in its prefix: $prefix" if -e $prefix;
 
 
 ## VERIFY SCRIPT PARAMETERS
-
-my $bits = length pack("l!")==8 ? 64 : 32;
 
 if ($lisp eq 'cmucl') {
   die "packaging cmucl for 64 bit platforms is not supported by this script (but is possible)" unless $arch eq 'i386';
@@ -71,6 +75,22 @@ if ($os eq 'linux') {
   usage();
 }
 
+
+
+## FIND ANTIWEB VERSION
+
+my $aw_version = `git describe --tags --match antiweb-\*`;
+chomp $aw_version;
+
+print <<END;
+
+OK, so far your setup looks good:
+  Antiweb version: $aw_version
+             Lisp: $lisp
+     Architecture: $arch
+ Operating System: $os
+
+END
 
 
 
@@ -121,14 +141,7 @@ if ($lisp eq 'cmucl') {
 
 
 
-## FIND ANTIWEB VERSION
-
-my $aw_version = `git describe --tags --match antiweb-\*`;
-print "Antiweb version: $aw_version\n";
-
-
-
-## BUILD local.lisp ANTIWEB BUILD CONFIGURATION FILE
+## CREATE ../local.lisp BUILD CONFIG AND BUILD ANTIWEB
 
 if ($lisp eq 'cmucl') {
   die "cmucl unimplemented";
@@ -137,6 +150,8 @@ if ($lisp eq 'cmucl') {
   print FH <<END;
 #+ccl
 (progn
+  (setq aw-bin-dir "$antiweb_bin_dir")
+  (setq aw-lib-dir "$antiweb_lib_dir")
   (setq aw-ccl-executable "$prefix/ccl/ccl64")
   (setq aw-use-bdb t)
   (setq aw-extra-cflags "-L$prefix/bdb$bits/lib/ -I$prefix/bdb$bits/include/")
@@ -146,18 +161,60 @@ if ($lisp eq 'cmucl') {
 (error "this package was configured for ClozureCL")
 END
   close(FH);
+
+  sys("cd .. ; $prefix/ccl/ccl64 -Q -l build.lisp");
 }
 
 
+## VERIFY BUILD
 
-## CONSTRUCT PACKAGE
+die "unable to find ../bin/antiweb - build failure?" unless -x "../bin/antiweb";
+die "unable to find ../bin/libantiweb$bits.so - build failure?" unless -e "../bin/libantiweb$bits.so";
+die "unable to find ../bin/antiweb.$lisp.image - build failure?" unless -e "../bin/antiweb.$lisp.image";
+
+
+
+## SETUP PACKAGE build/ DIRECTORY
 
 sys("rm -rf build");
 sys("mkdir build");
 
 sys("cp -r DEBIAN/ build");
 
-sys("mkdir -p build/usr/local/antiweb");
+sys(qq{ /usr/bin/env perl -pi -e 's|{{VERSION}}|$aw_version|' build/DEBIAN/control });
+sys(qq{ /usr/bin/env perl -pi -e 's|{{ARCH}}|$arch|' build/DEBIAN/control });
+
+sys("mkdir -p build/usr/local/");
+sys("cp -r $prefix build$prefix");
+
+sys("mkdir -p build$antiweb_bin_dir");
+sys("cp ../bin/antiweb build$antiweb_bin_dir");
+
+sys("mkdir -p build$antiweb_lib_dir");
+sys("cp ../bin/libantiweb$bits.so build$antiweb_lib_dir");
+sys("cp ../bin/antiweb.$lisp.image build$antiweb_lib_dir");
+
+
+
+## REMOVE VIRGIN LISP IMAGE - ONLY THE NEW ANTIWEB IMAGE IS REQUIRED
+
+if ($lisp eq 'cmucl') {
+  die "cmucl unimplemented";
+} elsif ($lisp eq 'ccl') {
+  sys("rm build$prefix/ccl/lx86cl64.image");
+}
+
+
+
+## ACTUALLY BUILD PACKAGE
+
+
+
+## REMOVE TEMPORARY FILES
+
+sys("rm -rf $prefix");
+sys("rm ../local.lisp");
+
 
 
 

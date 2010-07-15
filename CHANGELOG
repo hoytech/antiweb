@@ -9,6 +9,9 @@
 * Bugfix: Work around ClozureCL's broken detsetf implementation which
   was breaking the BerkeleyDB support. This work-around can be removed
   when/if ClozureCL issue #436 is resolved.
+* Feature: There is now a script in packager/make-debian-package.pl
+  that creates .deb packages for easy antiweb deployment. It must be
+  run from a cloned antiweb git repo.
 * Feature: More information on current antiweb installation are
   included in -version output.
 * Feature: Include Daniel Lowe's local-time library in the bundled/

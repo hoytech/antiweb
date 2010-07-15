@@ -24,6 +24,7 @@ END
   exit 1;
 }
 
+
 ## SCRIPT PARAMETERS
 
 my $lisp = shift || usage();
@@ -36,6 +37,7 @@ my $os = shift || usage();
 die "This packager script must be run as root" if $<;
 die "Unable to find DEBIAN/ directory. Not in packager directory" unless -d 'DEBIAN';
 die "This antiweb repo has a ../local.lisp. Please back it up and remove it." if -e '../local.lisp';
+die "This machine already seems to have an antiweb install in its prefix: $prefix" if -e $prefix;
 
 
 ## VERIFY SCRIPT PARAMETERS
@@ -71,20 +73,37 @@ if ($os eq 'linux') {
 
 
 
+
+## COPY LISP SYSTEMS INTO PREFIX
+
+if ($lisp eq 'cmucl') {
+  die "cmucl unimplemented";
+} elsif ($lisp eq 'ccl') {
+  print "*** Please enter a path to a ClozureCL directory with a binary then press enter:\n";
+  my $path = <>;
+  chomp $path;
+
+  die "path is not a directory: $path" unless -d $path;
+  die "unable to find binary at $path/lx86cl64" unless -x "$path/lx86cl64";
+  die "unable to find lisp image at $path/lx86cl64.image" unless -e "$path/lx86cl64.image";
+  die "unable to find launcher script at $path/scripts/ccl64" unless -x "$path/scripts/ccl64";
+
+  sys("mkdir -p $prefix/ccl/");
+  sys("cp $path/lx86cl64 $prefix/ccl/");
+  sys("cp $path/lx86cl64.image $prefix/ccl/");
+  sys("cp $path/scripts/ccl64 $prefix/ccl/");
+}
+
+
+## COPY BERKELEYDB LIBRARY INTO PREFIX
+
+
+
 ## FIND ANTIWEB VERSION
 
 my $aw_version = `git describe --tags --match antiweb-\*`;
 print "Antiweb version: $aw_version\n";
 
-
-
-=pod
-if ($lisp eq 'cmucl') {
-  die "Expected to find a cmucl installation at $prefix/"
-    unless (-d $prefix && -d "$prefix/
-} elsif ($lisp eq 'ccl') {
-}
-=cut
 
 
 

@@ -230,7 +230,7 @@ sys("rm ../local.lisp");
 
 ## ACTUALLY BUILD PACKAGE
 
-my $deb_package_filename = "antiweb" . "_" . $aw_version . "_" . $arch . ".deb";
+my $deb_package_filename = "antiweb" . "_" . $aw_version . "_" . "$lisp-$arch-$os" . ".deb";
 
 sys("dpkg -b build/ $deb_package_filename");
 

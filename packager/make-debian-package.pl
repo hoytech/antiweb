@@ -48,9 +48,9 @@ my $bits = length pack("l!")==8 ? 64 : 32;
 die "This packager script must be run as root" if $<;
 die "Unable to find DEBIAN/ directory. Not in packager directory" unless -d 'DEBIAN';
 die "This antiweb repo has a ../local.lisp. Please back it up and remove it." if -e '../local.lisp';
-die "This machine already seems to have an antiweb launch script at $antiweb_bin_dir/antiweb" if -x "$antiweb_bin_dir/antiweb";
-die "This machine already seems to have an antiweb library at $antiweb_lib_dir/libantiweb$bits.so" if -x "$antiweb_lib_dir/libantiweb$bits.so";
-die "This machine already seems to have an antiweb install in its prefix: $prefix" if -e $prefix;
+die "This machine already has an antiweb launch script at $antiweb_bin_dir/antiweb" if -e "$antiweb_bin_dir/antiweb";
+die "This machine already has an antiweb library at $antiweb_lib_dir/libantiweb$bits.so" if -e "$antiweb_lib_dir/libantiweb$bits.so";
+die "This machine already has an antiweb install in its prefix: $prefix" if -e $prefix;
 
 
 ## VERIFY SCRIPT PARAMETERS

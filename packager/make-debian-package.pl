@@ -55,7 +55,7 @@ die "This machine already seems to have an antiweb install in its prefix: $prefi
 ## VERIFY SCRIPT PARAMETERS
 
 if ($lisp eq 'cmu') {
-  die "packaging cmucl for 64 bit platforms is not supported by this script (but is possible)" unless $arch eq 'i386';
+  die "packaging cmucl for non-i386 platforms is not supported by this script (but is possible)" unless $arch eq 'i386';
 } elsif ($lisp eq 'ccl') {
   die "clozurecl is only stable on 64 bit platforms" unless $bits == 64;
 } else {

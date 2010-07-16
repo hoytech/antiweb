@@ -232,14 +232,14 @@ conns and ioblocks:
           )
           #"Some other details about the hub:"#
           (ul
-            #"Runs as its own UID specified in the hub conf file. The GID is always the same as the UID."#
+            #"Runs as its own user or UID specified in the hub conf file."#
             #"chroot()ed to the empty directory, of which it owns no permissions."#
           )
         )
         (logger-process "Logger process"
           #"The logger process is connected to the hub process over a unix socket. Its only job is to accept log messages from the hub process and write them to disk. When a worker creates a log message, it is routed through the hub to the logger process."#
           (ul
-            #"Runs as its own UID specified in the hub conf file. The GID is always the same as the UID."#
+            #"Runs as its own user or UID specified in the hub conf file."#
             #"chroot()ed to the aw_log directory, of which it has write permission."#
             #"It will chmod() the log files so they are never world readable/writeable."#
             #"Log files cannot be symlinks."#
@@ -248,7 +248,7 @@ conns and ioblocks:
         (worker-process "Worker Process(es)"
           #"The worker processes do the heavy lifting of processing HTTP requests."#
           (ul
-            #"Each runs under its own UID specified in the #(link "worker.html#UID" "worker conf"). The GID is always the same as the UID."#
+            #"Each runs under its own user or UID specified in the #(link "worker.html#UID" "worker conf")."#
             #"Optionally #(link "worker.html#CHROOT" "chroot()ed")."#
             #"Because it is transferred connecting client sockets, the worker process handles all subsequent HTTP requests on these sockets. They do not go through the hub."#
           )
@@ -279,7 +279,7 @@ conns and ioblocks:
           #"As an administrator, almost all Antiweb files you interact with are called <b>conf</b> files."#
           #"Conf files are text files filled with lisp forms. Every one of these lisp forms must be a list with the first element a symbol identifying the type of the form. This might be an example conf:"#
 (pre #"(worker blah)
-(uid 1234)"#)
+(uid "my-user")"#)
           #"If a worker contains an inherit element, the corresponding file will also be parsed as a conf and its contents are appended to the current file's conf:"#
           (pre #"(inherit "/absolute/path/to/inherited.conf")"#)
           (ul "Circular inherits are detected and signal errors.")
@@ -305,7 +305,7 @@ conns and ioblocks:
 #"<b>/usr/lib/antiweb.cmu.image</b> or <b>/usr/lib/antiweb.clisp.image</b> or <b>/usr/lib/antiweb.ccl.image</b> - A frozen image of the memory of an Antiweb lisp process. The name depends on your lisp environment."#
       )
       #"You also need to create a hub directory. Inside this directory (typically <b>/var/aw/</b>):"#
-      (ul #"<b>hub.conf</b> - Hub configuration. Includes which interaces/ports to listen for connections on (though you can #(link "faq.html#ADDING-LISTENERS" "add more later without restarting")), the UID the hub and logger processes should run as, and the file descriptor limit for the hub process."#
+      (ul #"<b>hub.conf</b> - Hub configuration. Includes which interaces/ports to listen for connections on (though you can #(link "faq.html#ADDING-LISTENERS" "add more later without restarting")), the user or UID the hub and logger processes should run as, and the file descriptor limit for the hub process."#
           #"<b>hub.socket</b> - Unix domain socket for connecting to the hub. It is owned by root and no other user can connect. All Antiweb administration, development, and inter-process communication is done through this socket."#
           #"<b>empty/</b> - An empty directory. The hub process is chroot()ed to this directory. It should have no write permission to this directory."#
           #"<b>aw_log/</b> - The log directory. The logger process is chroot()ed to this directory. This directory name starts with the "aw_" prefix because that is a special prefix and such directories will never be served by Antiweb through HTTP in case of an incorrectly configured HTML root. This convention dates back to Antiweb2. In any case, both of Antiweb's log files are owned and only readable by the logger user. The two log files are: #(ul #"<b>syslog</b> - System log messages. Always check this file first if something isn't working."# #"<b>axslog</b> - Access logs. All valid HTTP requests are recorded here."#) Workers pass log messages to the hub after which they are passed to the logger process. There are two ways to make the logger #(link "faq.html#REOPEN-LOG-FILES" "reopen its log files")."#
@@ -367,7 +367,7 @@ Password:
          (p #"You now need to create one or more worker conf files. They can be stored anywhere, but a good place is along with the hub.conf file in the hub directory:"#
             (pre #"# antiweb -skel-worker-basic > /var/aw/worker.conf"#)
             #"#(tip "-skel-worker-basic is just one of the possible worker skeletons. To see a list of all of them, run <b>antiweb</b> with no arguments.") You will now need to edit the created worker conf (ie <b>/var/aw/worker.conf</b>). At a minimum, you must specify the hub directory created in the previous step, the UID this worker should run as, the virtual hosts this worker should handle, and the location of the HTML root for this worker. For complete details on the config file format, see the #(link "worker.html" "worker conf file reference")."#
-            #"<b>IMPORTANT:</b> No conf files should ever be owned or writeable by a UID that a hub, logger, or worker process runs as. The conf files don't even need to be readable to them (but a worker's current conf file is stored in memory so making it unreadable only prevents <i>other</i> workers from reading it.)."#
+            #"<b>IMPORTANT:</b> No conf files should ever be owned or writeable by a UID or GID that a hub, logger, or worker process runs as. The conf files don't even need to be readable to them (but a worker's current conf file is stored in memory so making it unreadable only prevents <i>other</i> workers from reading it.)."#
          )
          (p #"Finally, start the antiweb processes:"#
             (pre #"# antiweb -hub /var/aw
@@ -637,7 +637,7 @@ Every worker process must have a worker conf file. See the #(link "install.html"
 (worker example)
 (hub-dir "/var/aw")
 (max-fds 32767)
-(uid 20001)
+(uid "my-user")
 
 (handler
   :hosts ("localhost" "127.0.0.1"
@@ -651,7 +651,7 @@ Every worker process must have a worker conf file. See the #(link "install.html"
 (sections
   (worker "worker" "Unique name for the worker process." (pre "(worker name)") (ul "Cannot be changed without restarting worker." "This xconf is required."))
   (hub-dir "hub-dir" "Absolute path to the hub directory that this worker should attempt to connect to." (pre #"(hub-dir "/var/aw")"#) (ul "Cannot be changed without restarting worker." "This xconf is required." "Because worker processes connect to the hub before a chroot, this option is unaffected by chroot."))
-  (uid "uid" "UID and GID to drop privileges to. Can be either a number or the name of a user." (pre "(uid 20001)") (pre #"(uid "user")"#) (ul "Cannot be changed without restarting worker." "This xconf is required." "The GID is always the same as the UID."))
+  (uid "uid" "User whose UID and GID the worker should drop privileges to. Can be either the name of a user or UID (in which case the GID is assumed to be the same and no user lookup is done)." (pre #"(uid "my-user")"#) (pre "(uid 20001)") (ul "Cannot be changed without restarting worker." "This xconf is required."))
   (max-fds "max-fds" "Before dropping privileges, set the maximum open file descriptor limit." (pre "(max-fds 32768)") (p (tip #"To see how many file descriptors any process is limited to, along with how many it is currently using, use #(link "faq.html#STATS" "-stats"). The number of open descriptors is an estimate because there are a few open but unaccounted for descriptors not part of Antiweb's connection data structures."#) (ul "Cannot be changed without restarting worker." "This xconf is optional but highly recommended if you anticipate moderate load and/or many keepalive connections." #"On some systems you may need to raise a system-wide process descriptor limit for this option to be effective. For example, on OpenBSD use this sysctl command: #(pre #"# sysctl kern.maxfiles=32768"#)"#)))
   (chroot "chroot" "This xconf is optional. If and only if it is present, the worker will chroot() to this directory before dropping privileges. Workers always chdir() to / (even if they don't chroot)." (pre #"(chroot "/absolute/path/to/chroot/to")"#) (ul "Cannot be changed without restarting worker." "If you use chroot note that most of the other paths in the worker conf will need to be relative to this new root (but still must begin with a slash)." #"Whether you should chroot your workers or not is a <b>policy decision</b>. If you chroot a worker, be aware that you will need to set up a "fake root" to run most CGI scripts."#))
   (cache "cache" #"Absolute path to the cache directory for this worker. For more details on the cache, see #(link "faq.html#CACHE" "this FAQ entry")."# (pre #"(cache "/absolute/path/to/cache")"#) (ul #"The cache directory must be owned by the worker's UID. No other user should be able to write to the cache directory and it should never be in /tmp and should never have a sticky bit."# "If the worker is choot()ed, the cache directory must be inside the chroot() and the given path must be relative to the new root." "Although providing a cache directory is optional, it is required to use gzip content encoding, javascript/CSS minification, or Anti Webpages." "Delete everything in the worker's cache directory before performing major directory re-organisations. The worker may die (details always logged in syslog) if what used to be a directory is now a file, etc."))

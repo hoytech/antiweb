@@ -14,7 +14,7 @@ usage:
   $0 <lisp> <architecture> <operating system>
 
 Valid lisp parameters:
-  cmucl
+  cmu
   ccl
 
 Valid architecture parameters:
@@ -56,7 +56,7 @@ die "This machine already seems to have an antiweb install in its prefix: $prefi
 
 ## VERIFY SCRIPT PARAMETERS
 
-if ($lisp eq 'cmucl') {
+if ($lisp eq 'cmu') {
   die "packaging cmucl for 64 bit platforms is not supported by this script (but is possible)" unless $arch eq 'i386';
 } elsif ($lisp eq 'ccl') {
   die "clozurecl is only stable on 64 bit platforms" unless $bits == 64;
@@ -111,8 +111,17 @@ END
 
 ## COPY LISP SYSTEMS INTO PREFIX
 
-if ($lisp eq 'cmucl') {
-  die "cmucl unimplemented";
+if ($lisp eq 'cmu') {
+  print "\n*** Please enter a path to a CMUCL directory then press enter:\n";
+  my $path = <>;
+  chomp $path;
+
+  die "path is not a directory: $path" unless -d $path;
+  die "unable to find binary at $path/bin/lisp" unless -x "$path/bin/lisp";
+  die "unable to find lib directory at $path/lib/" unless -d "$path/lib/";
+
+  sys("mkdir -p $prefix/cmucl/");
+  sys("cp -r $path/bin $path/lib $prefix/cmucl/");
 } elsif ($lisp eq 'ccl') {
   print "\n*** Please enter a path to a ClozureCL directory then press enter:\n";
   my $path = <>;
@@ -145,6 +154,7 @@ if ($lisp eq 'cmucl') {
   die "path is not a directory: $path" unless -d $path;
   die "unable to find db_recover utility at $path/bin/db_recover" unless -x "$path/bin/db_recover";
   die "unable to find lib/ directory at $path/lib/" unless -d "$path/lib";
+  die "unable to find $path/lib/libdb.a" unless -e "$path/lib/libdb.a";
   die "unable to find include/ directory at $path/include/" unless -d "$path/include";
 
   sys("mkdir -p $prefix/bdb$bits/");
@@ -158,8 +168,24 @@ if ($lisp eq 'cmucl') {
 
 ## CREATE ../local.lisp BUILD CONFIG AND BUILD ANTIWEB
 
-if ($lisp eq 'cmucl') {
-  die "cmucl unimplemented";
+if ($lisp eq 'cmu') {
+  open(FH, "> ../local.lisp");
+  print FH <<END;
+#+cmu
+(progn
+  (setq aw-bin-dir "$antiweb_bin_dir")
+  (setq aw-lib-dir "$antiweb_lib_dir")
+  (setq aw-cmu-executable "$prefix/cmucl/bin/lisp")
+  (setq aw-use-bdb t)
+  (setq aw-extra-cflags "-L$prefix/bdb$bits/lib -I$prefix/bdb$bits/include/ -Wl,-rpath=$prefix/bdb$bits/lib")
+)
+
+#-cmu
+(error "this package was configured for CMUCL")
+END
+  close(FH);
+
+  sys("cd .. ; $prefix/cmucl/bin/lisp -quiet -load build.lisp");
 } elsif ($lisp eq 'ccl') {
   open(FH, "> ../local.lisp");
   print FH <<END;
@@ -169,7 +195,7 @@ if ($lisp eq 'cmucl') {
   (setq aw-lib-dir "$antiweb_lib_dir")
   (setq aw-ccl-executable "$prefix/ccl/ccl64")
   (setq aw-use-bdb t)
-  (setq aw-extra-cflags "-L$prefix/bdb$bits/lib/ -I$prefix/bdb$bits/include/")
+  (setq aw-extra-cflags "-L$prefix/bdb$bits/lib -I$prefix/bdb$bits/include/ -Wl,-rpath=$prefix/bdb$bits/lib")
 )
 
 #-ccl 
@@ -213,8 +239,8 @@ sys("cp ../bin/antiweb.$lisp.image build$antiweb_lib_dir");
 
 ## REMOVE VIRGIN LISP IMAGE - ONLY THE NEW ANTIWEB IMAGE IS REQUIRED
 
-if ($lisp eq 'cmucl') {
-  die "cmucl unimplemented";
+if ($lisp eq 'cmu') {
+  sys("rm build$prefix/cmucl/lib/cmucl/lib/*.core");
 } elsif ($lisp eq 'ccl') {
   sys("rm build$prefix/ccl/lx86cl64.image");
 }

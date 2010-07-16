@@ -11,6 +11,8 @@ create_system_user("aw-logger");
 
 if (-d $hubdir) {
   print "Hub directory '$hubdir' already exists, skipping creation...\n";
+} elsif (-e $hubdir) {
+  print "Hub directory '$hubdir' exists and is not a directory, skipping creation...\n";
 } else {
   print "Creating hub directory '$hubdir'\n";
   mkdir($hubdir) || die "unable to mkdir $hubdir : $!";

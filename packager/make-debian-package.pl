@@ -8,22 +8,20 @@ my $antiweb_lib_dir = '/usr/lib';
 
 sub usage {
   print STDERR <<END;
-Antiweb .deb packager script (C) Doug Hoyte
+
+Antiweb (C) Doug Hoyte
+
+Debian package creation script
+
 usage:
-  $0 clean
   $0 <lisp> <architecture> <operating system>
 
-Valid lisp parameters:
-  cmu
-  ccl
+  $0 ccl amd64 linux
+  $0 cmu i386 linux
+  $0 cmu i386 freebsd ## not implemented
 
-Valid architecture parameters:
-  amd64
-  i386
+  $0 clean ## removes build/ and *.deb
 
-Valid operating system parameters:
-  linux
-  freebsd
 END
   exit 1;
 }

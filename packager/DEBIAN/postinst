@@ -1,0 +1,67 @@
+#!/usr/bin/env perl
+
+use strict;
+
+my $hubdir = '/var/aw';
+
+my $uname = `uname`;
+
+create_system_user("aw-hub");
+create_system_user("aw-logger");
+
+if (-d $hubdir) {
+  print "Hub directory '$hubdir' already exists, skipping creation...\n";
+} else {
+  print "Creating hub directory '$hubdir'\n";
+  mkdir($hubdir) || die "unable to mkdir $hubdir : $!";
+
+  open(FH, "> $hubdir/hub.conf");
+  print FH <<END;
+(hub-uid "aw-hub")
+(logger-uid "aw-logger")
+(max-fds 10000)
+(listen "0.0.0.0" 80)
+
+;; For custom dispatching logic (see FAQ):
+;; (inherit "/path/to/hub-inc.conf")
+END
+  close(FH);
+
+  mkdir("$hubdir/empty") || die "unable to mkdir $hubdir/empty : $!";
+
+  mkdir("$hubdir/aw_log") || die "unable to mkdir $hubdir/aw_log : $!";
+  system("chown aw-logger $hubdir/aw_log");
+  system("chgrp aw-logger $hubdir/aw_log");
+}
+
+
+print <<END;
+
+Antiweb is installed!
+
+END
+
+exit 0;
+
+
+
+## UTILS
+
+sub create_system_user {
+  my $user = shift;
+
+  `id $user 2>&1`;
+
+  if ($?) {
+    print "Creating user '$user'...\n";
+
+    if ($uname =~ /linux/i) {
+      my $ret = system("adduser --quiet --system --group --no-create-home $user");
+      die "Unable to add user '$user'" if $ret;
+    } else {
+      die "unsupported platform";
+    }
+  } else {
+    print "User '$user' already exists, skipping creation...\n";
+  }
+}

@@ -272,14 +272,3 @@ sub sys {
   my $ret = system($cmd);
   die "** system() failed with non-zero exit code ($ret)" if $ret;
 }
-
-
-=pod
-/usr/local/antiweb/
-  lib
-
-  bdb32
-  bdb64
-
-  ccl
-=cut

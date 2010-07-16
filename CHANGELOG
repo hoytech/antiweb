@@ -11,6 +11,7 @@
   when/if ClozureCL issue #436 is resolved.
 * Change: When launching the hub in -nodaemon mode, the logger process
   is also not daemonised.
+* Feature: More debugging output in -nodaemon mode.
 * Feature: Antiweb now supports user/group setups where the UIDs
   and GIDs differ.
 * Feature: There is now a script in packager/make-debian-package.pl

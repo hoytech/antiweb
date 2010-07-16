@@ -437,14 +437,17 @@ if ($switch eq "-hub") {
       die "couldn't fork: $!" unless defined $rv;
 
       if ($rv) {
+        print "Started logger process ($rv)\n";
         waitpid($rv, 0);
-        print "Logger process terminated\n";
+        print "Logger process ($rv) terminated\n";
         exit;
       } else {
+        print "Launching logger process ($$)\n";
         exec_lisp("(run-logger \"$arg\" t)");
       }
     }
 
+    print "Launching hub process ($$)\n";
     exec_lisp("(run-hub \"$arg\" t)");
   } else {
     # In regular operation, a child process is forked which launches the hub
@@ -470,13 +473,19 @@ if ($switch eq "-hub") {
   my $arg = shift or usage();
   die "Not a worker conf: $arg" unless (-f $arg);
   die "Path to worker conf must be absolute" unless $arg =~ m|^/|;
-  exec_lisp("(run-worker \"$arg\" :nodaemon t)") if $nodaemon;
+  if ($nodaemon) {
+    print "Launching worker process ($$)\n";
+    exec_lisp("(run-worker \"$arg\" :nodaemon t)");
+  }
   exec_lisp("(run-worker \"$arg\")");
 } elsif ($switch eq "-check-worker") {
   my $arg = shift or usage();
   die "Not a worker conf: $arg" unless (-f $arg);
   die "Path to worker conf must be absolute" unless $arg =~ m|^/|;
-  exec_lisp("(run-worker \"$arg\" :nodaemon t :checking t)") if $nodaemon;
+  if ($nodaemon) {
+    print "Checking worker process ($$)\n";
+    exec_lisp("(run-worker \"$arg\" :nodaemon t :checking t)");
+  }
   exec_lisp("(run-worker \"$arg\" :checking t)");
 } elsif ($switch eq "-reload") {
   my $arg = shift or usage();

@@ -18,7 +18,8 @@ usage:
 
   $0 ccl amd64 linux
   $0 cmu i386 linux
-  $0 cmu i386 freebsd ## not implemented
+  $0 cmu i386 freebsd ## FIXME: not implemented
+  $0 cmu amd64 linux ## FIXME: not implemented
 
   $0 clean ## removes build/ and *.deb
 

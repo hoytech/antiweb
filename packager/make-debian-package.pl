@@ -225,8 +225,8 @@ sys("cp -r DEBIAN/ build");
 sys(qq{ /usr/bin/env perl -pi -e 's|{{VERSION}}|$aw_version|' build/DEBIAN/control });
 sys(qq{ /usr/bin/env perl -pi -e 's|{{ARCH}}|$arch|' build/DEBIAN/control });
 
-sys("mkdir -p build/usr/local/");
-sys("cp -r $prefix build$prefix");
+sys("mkdir -p build$prefix");
+sys("cp -r $prefix/* build$prefix");
 
 sys("mkdir -p build$antiweb_bin_dir");
 sys("cp ../bin/antiweb build$antiweb_bin_dir");

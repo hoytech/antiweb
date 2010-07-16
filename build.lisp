@@ -438,10 +438,10 @@ if ($switch eq "-hub") {
 
       if ($rv) {
         waitpid($rv, 0);
-        print "WARNING: Unable to start logger process\n" if $?;
+        print "Logger process terminated\n";
         exit;
       } else {
-        exec_lisp("(run-logger \"$arg\")");
+        exec_lisp("(run-logger \"$arg\" t)");
       }
     }
 

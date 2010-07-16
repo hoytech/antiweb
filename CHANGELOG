@@ -9,6 +9,8 @@
 * Bugfix: Work around ClozureCL's broken detsetf implementation which
   was breaking the BerkeleyDB support. This work-around can be removed
   when/if ClozureCL issue #436 is resolved.
+* Change: When launching the hub in -nodaemon mode, the logger process
+  is also not daemonised.
 * Feature: There is now a script in packager/make-debian-package.pl
   that creates .deb packages for easy antiweb deployment. It must be
   run from a cloned antiweb git repo.

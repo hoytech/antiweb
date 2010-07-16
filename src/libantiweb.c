@@ -2401,13 +2401,13 @@ void aw_init() {
 
 
 
-void aw_dropto_uid_gid(int id) {
-  if (id == 0)
-    fatal("aw_dropto_uid_gid: can't drop to root");
-  if (setgid(id) == -1)
-    fatal("aw_dropto_uid_gid: setgid: %s", strerror(errno));
-  if (setuid(id) == -1)
-    fatal("aw_dropto_uid_gid: setuid: %s", strerror(errno));
+void aw_dropto_uid_gid(int uid, int gid) {
+  if (uid == 0 || gid == 0)
+    fatal("aw_dropto_uid_gid: can't drop to root (%d, %d)", uid, gid);
+  if (setgid(gid) == -1)
+    fatal("aw_dropto_uid_gid: setgid(%d): %s", gid, strerror(errno));
+  if (setuid(uid) == -1)
+    fatal("aw_dropto_uid_gid: setuid(%d): %s", uid, strerror(errno));
 }
 
 
@@ -2417,15 +2417,21 @@ int aw_lookup_user_name_with_getpwnam(char *name) {
   p = getpwnam(name);
 
   if (p == NULL)
-    fatal("aw_lookup_user_name_with_getpwnam: couldn't lookup username %s", name);
-
-  if (p->pw_uid == 0)
-    fatal("aw_lookup_user_name_with_getpwnam: won't run with UID 0 of user %s", name);
-
-  if (p->pw_uid != p->pw_gid)
-    fatal("aw_lookup_user_name_with_getpwnam: user %s has different UID from GID", name);
+    fatal("aw_lookup_user_name_with_getpwnam: couldn't lookup user: %s", name);
 
   return (int) p->pw_uid;
+}
+
+
+int aw_lookup_group_name_with_getpwnam(char *name) {
+  struct passwd *p;
+
+  p = getpwnam(name);
+
+  if (p == NULL)
+    fatal("aw_lookup_group_name_with_getpwnam: couldn't lookup group: %s", name);
+
+  return (int) p->pw_gid;
 }
 
 

@@ -98,6 +98,7 @@ struct conn *aw_get_event();
 void aw_init();
 void aw_dropto_uid_gid(int id);
 int aw_lookup_user_name_with_getpwnam(char *name);
+int aw_lookup_group_name_with_getpwnam(char *name);
 void aw_chroot(char *path);
 void aw_set_nofile(int n);
 int aw_get_nofile();

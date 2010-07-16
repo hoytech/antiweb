@@ -2414,10 +2414,15 @@ void aw_dropto_uid_gid(int uid, int gid) {
 int aw_lookup_user_name_with_getpwnam(char *name) {
   struct passwd *p;
 
+  again:
+
+  errno = 0;
   p = getpwnam(name);
 
-  if (p == NULL)
-    fatal("aw_lookup_user_name_with_getpwnam: couldn't lookup user: %s", name);
+  if (p == NULL) {
+    if (errno == EINTR) goto again;
+    fatal("aw_lookup_user_name_with_getpwnam: couldn't lookup user '%s' (%s)", name, strerror(errno));
+  }
 
   return (int) p->pw_uid;
 }
@@ -2426,10 +2431,15 @@ int aw_lookup_user_name_with_getpwnam(char *name) {
 int aw_lookup_group_name_with_getpwnam(char *name) {
   struct passwd *p;
 
+  again:
+
+  errno = 0;
   p = getpwnam(name);
 
-  if (p == NULL)
-    fatal("aw_lookup_group_name_with_getpwnam: couldn't lookup group: %s", name);
+  if (p == NULL) {
+    if (errno == EINTR) goto again;
+    fatal("aw_lookup_group_name_with_getpwnam: couldn't lookup group '%s' (%s)", name, strerror(errno));
+  }
 
   return (int) p->pw_gid;
 }

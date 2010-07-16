@@ -35,9 +35,25 @@ END
 }
 
 
-print <<END;
+print <<'END';
 
-Antiweb is installed!
+Congratulations, Antiweb is installed!
+
+What's next?
+
+1) Create a worker user:
+
+  sudo adduser --quiet --system --group --no-create-home my-website
+
+2) Create a worker conf file and edit it:
+
+  antiweb -skel-worker-basic > /web/etc/my-website.conf
+  vi /web/etc/my-website.conf
+
+3) Start the processes:
+
+  sudo antiweb -hub /var/aw
+  sudo antiweb -worker /etc/web/my-website.conf
 
 END
 

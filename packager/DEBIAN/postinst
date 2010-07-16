@@ -55,7 +55,7 @@ What's next?
 3) Start the processes:
 
   sudo antiweb -hub /var/aw
-  sudo antiweb -worker /etc/web/my-website.conf
+  sudo antiweb -worker /web/etc/my-website.conf
 
 END
 

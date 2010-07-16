@@ -293,7 +293,7 @@ int main() {
 
 (format t "BUILD: Creating Antiweb launch script~%")
 (with-open-file (o "bin/antiweb" :direction :output :if-exists :supersede)
-  (format o #"#!/usr/bin/perl~%"#)
+  (format o #"#!/usr/bin/env perl~%"#)
   (format o #"use strict;~%"#)
 
   (format o #"my $cl_sys = "~a";~%"# #+cmu "cmu" #+clisp "clisp" #+ccl "ccl")

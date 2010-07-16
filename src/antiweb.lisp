@@ -139,13 +139,23 @@
 
 (defun aw-lookup-user-name-with-getpwnam (name)
   (cond
-    ((and (integerp name) (<= 1 name 65534))
+    ((and (integerp name) (<= 0 name 65534))
        name)
     ((stringp name)
        (cffi:with-foreign-string (fstr name)
          (aw_lookup_user_name_with_getpwnam fstr)))
     (t
-       (error "bad value for name: ~a" name))))
+       (error "bad value for user name: ~a" name))))
+
+(defun aw-lookup-group-name-with-getpwnam (name)
+  (cond
+    ((and (integerp name) (<= 0 name 65534))
+       name)
+    ((stringp name)
+       (cffi:with-foreign-string (fstr name)
+         (aw_lookup_group_name_with_getpwnam fstr)))
+    (t
+       (error "bad value for group name: ~a" name))))
 
 (defun aw-chmod (path mode)
   (cffi:with-foreign-string (fstr path)
@@ -875,14 +885,13 @@
         (aw_close_log_file v))
       (setf aw-open-log-files (make-hash-table :test 'equal)))))
 
-(defun get-log-file (logfile)
+(defun get-log-file (logfile logger-uid logger-gid)
   (let ((f (gethash logfile aw-open-log-files)))
     (if f
       (return-from get-log-file f))
     (cffi:with-foreign-string (fstr (format nil "/~a" logfile))
       (setf f (aw_open_log_file fstr))
-      (let ((stat (aw_lstat_returning_a_static_struct fstr))
-            (logger-uid (aw-lookup-user-name-with-getpwnam (conf-get aw-hub-conf 'logger-uid))))
+      (let ((stat (aw_lstat_returning_a_static_struct fstr)))
         (unless (cffi:null-pointer-p stat)
           (unless (zerop (aw_stat_is_sym_link stat))
             (fatal "~a/aw_log/~a can't be a symlink" aw-hub-dir logfile))
@@ -890,14 +899,14 @@
             (fatal "~a/aw_log/~a must be a file" aw-hub-dir logfile))
           (unless (= logger-uid (aw_stat_get_uid stat))
             (fatal "~a/aw_log/~a not owned by hub user" aw-hub-dir logfile))
-          (unless (= logger-uid (aw_stat_get_gid stat))
+          (unless (= logger-gid (aw_stat_get_gid stat))
             (fatal "~a/aw_log/~a in different group from hub" aw-hub-dir logfile))))
       (setf (gethash logfile aw-open-log-files) f)
       (aw-chmod logfile #b110000000)
       f)))
 
 
-(defun logger-setup-hub-conn ()
+(defun logger-setup-hub-conn (logger-uid logger-gid)
   (let ((c (cffi:with-foreign-string (fstr (format nil "~a/hub.socket" aw-hub-dir))
              (aw_conn_unix fstr))))
     (setf hub_conn c)
@@ -915,7 +924,7 @@
             (when-match (#~m/^log ([\w-_.]+) (\d+)\n$/ shared-input-buffer)
               (read-fixed-length-message-from-conn-and-store-in-shared-input-buffer (parse-integer $2)
                 (cffi:with-foreign-string (fstr shared-input-buffer)
-                  (aw_write_log_message (get-log-file $1) fstr))
+                  (aw_write_log_message (get-log-file $1 logger-uid logger-gid) fstr))
                 logger-main))
             (fatal "bad message from hub")))))))
 
@@ -1431,14 +1440,18 @@
     (let (*read-eval*)
       (setf aw-hub-conf (load-conf-from-file (format nil "~a/hub.conf" aw-hub-dir))))
     (let ((hub-uid (aw-lookup-user-name-with-getpwnam (conf-get aw-hub-conf 'hub-uid)))
+          (hub-gid (aw-lookup-group-name-with-getpwnam (conf-get aw-hub-conf 'hub-uid)))
           (logger-uid (aw-lookup-user-name-with-getpwnam (conf-get aw-hub-conf 'logger-uid)))
+          (logger-gid (aw-lookup-group-name-with-getpwnam (conf-get aw-hub-conf 'logger-uid)))
           (max-fds (conf-get aw-hub-conf 'max-fds))
           (install-hub-rewrite-host-form (conf-get aw-hub-conf 'install-hub-rewrite-host)))
 
       (if (or (not (integerp hub-uid)) (zerop hub-uid))
         (error "hub can't run as root"))
-      (if (equal hub-uid logger-uid)
+      (if (= hub-uid logger-uid)
         (error "hub and logger processes must run under different users"))
+      (if (= hub-gid logger-gid)
+        (error "hub and logger processes must run under different groups"))
 
       (cffi:with-foreign-string (pstr (format nil "~a/empty" aw-hub-dir))
         (let ((stat (aw_stat_returning_a_static_struct pstr)))
@@ -1448,7 +1461,7 @@
             (error "empty dir must be a directory"))
           (if (= hub-uid (aw_stat_get_uid stat))
             (error "empty directory is owned by hub-uid (~a)" hub-uid))
-          (if (= logger-uid (aw_stat_get_gid stat))
+          (if (= hub-gid (aw_stat_get_gid stat))
             (error "empty directory in same group as hub-uid (~a)" hub-uid))))
 
       (aw-chmod (format nil "~a/empty" aw-hub-dir) #b111101101)
@@ -1465,7 +1478,7 @@
 
       (cffi:with-foreign-string (pstr (format nil "~a/empty" aw-hub-dir))
         (aw_chroot pstr))
-      (aw_dropto_uid_gid hub-uid)
+      (aw_dropto_uid_gid hub-uid hub-gid)
       (aw_set_nproc 1)))
 
   ;; Unprivileged
@@ -1486,12 +1499,16 @@
     (let (*read-eval*)
       (setf aw-hub-conf (load-conf-from-file (format nil "~a/hub.conf" aw-hub-dir))))
     (let ((logger-uid (aw-lookup-user-name-with-getpwnam (conf-get aw-hub-conf 'logger-uid)))
-          (hub-uid (aw-lookup-user-name-with-getpwnam (conf-get aw-hub-conf 'hub-uid))))
+          (logger-gid (aw-lookup-group-name-with-getpwnam (conf-get aw-hub-conf 'logger-uid)))
+          (hub-uid (aw-lookup-user-name-with-getpwnam (conf-get aw-hub-conf 'hub-uid)))
+          (hub-gid (aw-lookup-group-name-with-getpwnam (conf-get aw-hub-conf 'hub-uid))))
 
       (if (or (not (integerp logger-uid)) (zerop logger-uid))
         (error "logger can't run as root"))
-      (if (equal hub-uid logger-uid)
+      (if (= hub-uid logger-uid)
         (error "hub and logger processes must run under different users"))
+      (if (= hub-gid logger-gid)
+        (error "hub and logger processes must run under different groups"))
 
       (cffi:with-foreign-string (pstr (format nil "~a/aw_log" aw-hub-dir))
         (let ((stat (aw_stat_returning_a_static_struct pstr)))
@@ -1501,17 +1518,17 @@
             (error "aw_log dir must be a directory"))
           (unless (= logger-uid (aw_stat_get_uid stat))
             (error "aw_log directory isn't owned by logger-uid (~a)" logger-uid))
-          (unless (= logger-uid (aw_stat_get_gid stat))
-            (error "aw_log directory in different group from logger-uid (~a)" logger-uid))))
+          (unless (= logger-gid (aw_stat_get_gid stat))
+            (error "aw_log directory group isn't the logger user's group (~a)" logger-gid))))
 
       (aw-chmod (format nil "~a/aw_log" aw-hub-dir) #b111000000)
 
       (unless nodaemon (aw-daemonise-drop-terminal))
 
-      (logger-setup-hub-conn)
+      (logger-setup-hub-conn logger-uid logger-gid)
       (cffi:with-foreign-string (pstr (format nil "~a/aw_log" aw-hub-dir))
         (aw_chroot pstr))
-      (aw_dropto_uid_gid logger-uid)
+      (aw_dropto_uid_gid logger-uid logger-gid)
       (aw_set_nproc 1)))
 
   ;; Unprivileged
@@ -1609,6 +1626,7 @@
     (setf aw-hub-dir (conf-get aw-worker-conf 'hub-dir))
     (worker-unix-connect checking)
     (let ((uid (aw-lookup-user-name-with-getpwnam (conf-get aw-worker-conf 'uid)))
+          (gid (aw-lookup-group-name-with-getpwnam (conf-get aw-worker-conf 'uid)))
           (max-fds (conf-get aw-worker-conf 'max-fds))
           (chroot (conf-get aw-worker-conf 'chroot))
           (bdb-dir (conf-get aw-worker-conf 'bdb-dir)))
@@ -1620,7 +1638,7 @@
       (if chroot
         (cffi:with-foreign-string (pstr chroot)
           (aw_chroot pstr)))
-      (aw_dropto_uid_gid uid)
+      (aw_dropto_uid_gid uid gid)
       (if bdb-dir
         (aw-bdb-init-environment bdb-dir))))
 
@@ -1642,6 +1660,10 @@
              (aw_conn_unix fstr)))
         (cmd-str-eval (if cmd-str (format nil "eval ~a~%~a" (length cmd-str) cmd-str) "")))
     (aw_dropto_uid_gid (aw-lookup-user-name-with-getpwnam
+                         (if transfer
+                           (conf-get aw-worker-conf 'uid)
+                           (conf-get aw-hub-conf 'hub-uid)))
+                       (aw-lookup-group-name-with-getpwnam
                          (if transfer
                            (conf-get aw-worker-conf 'uid)
                            (conf-get aw-hub-conf 'hub-uid))))

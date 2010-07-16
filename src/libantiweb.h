@@ -96,7 +96,7 @@ void aw_event_remove_all(struct conn *c);
 void remove_from_artificial_ready_conns(struct conn *c);
 struct conn *aw_get_event();
 void aw_init();
-void aw_dropto_uid_gid(int id);
+void aw_dropto_uid_gid(int uid, int gid);
 int aw_lookup_user_name_with_getpwnam(char *name);
 int aw_lookup_group_name_with_getpwnam(char *name);
 void aw_chroot(char *path);

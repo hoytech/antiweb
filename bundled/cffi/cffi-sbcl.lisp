@@ -305,6 +305,8 @@ WITH-POINTER-TO-VECTOR-DATA."
 
 (defun %close-foreign-library (name)
   "Closes the foreign library NAME."
+  (error "%close-foreign-library not implemented on SBCL")
+  #+nil
   (sb-alien::dlclose-or-lose
    (find name sb-alien::*shared-objects*
          :key #'sb-alien::shared-object-file

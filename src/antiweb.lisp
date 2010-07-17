@@ -450,7 +450,7 @@
              :initform nil
              :initarg :contents)))
 
-(defmethod print-object ((l lenient-struct) (s stream))
+(defmethod print-object ((l lenient-struct) s)
   (format s "#S~S" (lenient-struct-contents l)))
 
 (defmacro! with-lenient-struct-reader (&rest body)

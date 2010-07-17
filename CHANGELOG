@@ -1,4 +1,4 @@
-4.0BETA17
+4.0BETA17   Jul 17, 2010
 
 * Bugfix: Don't print error message when closing a connection to an
   attached antiweb process with control-D.

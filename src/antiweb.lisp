@@ -1395,7 +1395,7 @@
 
 
 
-(defconstant names-of-the-months
+(defparameter names-of-the-months
   #(nil "January" "February" "March" "April" "May" "June" "July" "August"
     "September" "October" "November" "December"))
 

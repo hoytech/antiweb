@@ -24,6 +24,7 @@
 (defvar aw-cmu-executable "lisp")
 (defvar aw-clisp-executable "clisp")
 (defvar aw-ccl-executable "ccl64")
+(defvar aw-sbcl-executable "sbcl")
 
 ;;;;;;;;;;;;;;; END OF ANTIWEB BUILD OPTIONS ;;;;;;;;;;;;;;;;;
 
@@ -708,7 +709,7 @@ install -m 644 libantiweb~a.so ~a/
 install -m 644 antiweb.~a.image ~a/
 "# aw-bin-dir
    aw-bits aw-lib-dir
-   #+cmu "cmu" #+clisp "clisp" #+ccl "ccl" aw-lib-dir))
+   #+cmu "cmu" #+clisp "clisp" #+ccl "ccl" #+sbcl "sbcl" aw-lib-dir))
 (system "chmod a+x bin/install.sh")
 
 
@@ -721,9 +722,10 @@ install -m 644 antiweb.~a.image ~a/
 
 (format t "BUILD: Antiweb v~a build OK~%" AW_VERSION)
 
-(let ((image-name (format nil "bin/antiweb.~a.image" #+cmu "cmu" #+clisp "clisp" #+ccl "ccl")))
+(let ((image-name (format nil "bin/antiweb.~a.image" #+cmu "cmu" #+clisp "clisp" #+ccl "ccl" #+sbcl "sbcl")))
   (format t "************* Saving lisp image to ~a *************~%" image-name)
   #+cmu (save-lisp image-name)
   #+clisp (ext:saveinitmem image-name)
   #+ccl (save-application image-name)
+  #+sbcl (sb-ext:save-lisp-and-die image-name)
 )

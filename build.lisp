@@ -280,7 +280,7 @@ int main() {
 
             "")))))))))
 
-(load (compile-file "src/libantiweb-h.lisp"))
+(load "src/libantiweb-h.lisp")
 
 
 

@@ -37,6 +37,7 @@
 
 
 (defpackage #:jsmin
+   (:use :cl)
    (:export #:jsmin
             #:jsmin-file))
 

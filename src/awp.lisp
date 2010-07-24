@@ -255,7 +255,9 @@
             (format s #"</tr></table>"#)))))))
 
 (defun keyword-intern (str)
-  (intern (string-upcase str) #+cmu *keyword-package* #+clisp system::*keyword-package* #+ccl ccl::*keyword-package*))
+  (intern (string-upcase str)
+          #+cmu *keyword-package* #+clisp system::*keyword-package* #+ccl ccl::*keyword-package* #+sbcl sb-int:*keyword-package*
+          #-(or cmu clisp ccl sbcl) (error "keyword-intern not yet implemented for this lisp system")))
 
 (defun awp-compile-layout-element (element page &optional element-width)
   (let ((layout (xconf-get page (keyword-intern (format nil "~a-layout" element)))))

@@ -85,6 +85,8 @@
         #+cmu (room nil)
         #+clisp (room)
         #+ccl (room t)
+        #+sbcl (room t)
+        #-(or cmu clisp ccl sbcl) (room)
       )))
     (aw-room-antiweb-memory)))
 
@@ -450,7 +452,7 @@
              :initform nil
              :initarg :contents)))
 
-(defmethod print-object ((l lenient-struct) (s stream))
+(defmethod print-object ((l lenient-struct) s)
   (format s "#S~S" (lenient-struct-contents l)))
 
 (defmacro! with-lenient-struct-reader (&rest body)
@@ -1395,7 +1397,7 @@
 
 
 
-(defconstant names-of-the-months
+(defparameter names-of-the-months
   #(nil "January" "February" "March" "April" "May" "June" "July" "August"
     "September" "October" "November" "December"))
 

@@ -14,6 +14,7 @@ Building:
   CMUCL: lisp -quiet -load build.lisp
   CLISP: clisp -q build.lisp
   ClozureCL: ccl64 -Q -l build.lisp
+  SBCL: sbcl --noinform --load build.lisp
 
 Installing:
   cd bin

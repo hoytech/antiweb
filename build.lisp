@@ -24,6 +24,7 @@
 (defvar aw-cmu-executable "lisp")
 (defvar aw-clisp-executable "clisp")
 (defvar aw-ccl-executable "ccl64")
+(defvar aw-sbcl-executable "sbcl")
 
 ;;;;;;;;;;;;;;; END OF ANTIWEB BUILD OPTIONS ;;;;;;;;;;;;;;;;;
 
@@ -280,7 +281,7 @@ int main() {
 
             "")))))))))
 
-(load (compile-file "src/libantiweb-h.lisp"))
+(load "src/libantiweb-h.lisp")
 
 
 
@@ -296,7 +297,7 @@ int main() {
   (format o #"#!/usr/bin/env perl~%"#)
   (format o #"use strict;~%"#)
 
-  (format o #"my $cl_sys = "~a";~%"# #+cmu "cmu" #+clisp "clisp" #+ccl "ccl")
+  (format o #"my $cl_sys = "~a";~%"# #+cmu "cmu" #+clisp "clisp" #+ccl "ccl" #+sbcl "sbcl")
 
   (format o #"my $bin_dir = "~a";~%"# aw-bin-dir)
   (format o #"my $lib_dir = "~a";~%"# aw-lib-dir)
@@ -307,6 +308,7 @@ int main() {
   (format o #"my $cmu_exec = "~a";~%"# aw-cmu-executable)
   (format o #"my $clisp_exec = "~a";~%"# aw-clisp-executable)
   (format o #"my $ccl_exec = "~a";~%"# aw-ccl-executable)
+  (format o #"my $sbcl_exec = "~a";~%"# aw-sbcl-executable)
 
   (princ #>END_OF_ANTIWEB_LAUNCH_SCRIPT
 
@@ -341,7 +343,7 @@ Maintenance/Development:
   antiweb -awp <awp file> <base directory>
 
 Optional Flags:
-  -cmu -clisp -ccl -nodaemon -noreadline
+  -cmu -clisp -ccl -sbcl -nodaemon -noreadline
 
 END
   exit;
@@ -360,6 +362,8 @@ while(1) {
     $cl_sys = "clisp";
   } elsif ($switch eq "-ccl") {
     $cl_sys = "ccl";
+  } elsif ($switch eq "-sbcl") {
+    $cl_sys = "sbcl";
   } elsif ($switch eq "-nodaemon") {
     $nodaemon = 1;
   } elsif ($switch eq "-noreadline") {
@@ -384,6 +388,9 @@ sub exec_lisp {
   } elsif ($cl_sys eq "ccl") {
     exec("$ccl_exec -Q -I '$lib_dir/antiweb.ccl.image' -e '$expr'");
     die "Couldn't exec ClozureCL program '$ccl_exec'";
+  } elsif ($cl_sys eq "sbcl") {
+    exec("$sbcl_exec --noinform --core '$lib_dir/antiweb.sbcl.image' --eval '$expr'");
+    die "Couldn't exec SBCL program '$sbcl_exec'";
   }
   die "Unknown cl_sys: $cl_sys";
 }
@@ -557,6 +564,7 @@ if ($switch eq "-hub") {
   print $cmu_exec if $cl_sys eq "cmu";
   print $clisp_exec if $cl_sys eq "clisp";
   print $ccl_exec if $cl_sys eq "ccl";
+  print $sbcl_exec if $cl_sys eq "sbcl";
   print "\n";
   print "\n";
   my $arg = shift;
@@ -708,7 +716,7 @@ install -m 644 libantiweb~a.so ~a/
 install -m 644 antiweb.~a.image ~a/
 "# aw-bin-dir
    aw-bits aw-lib-dir
-   #+cmu "cmu" #+clisp "clisp" #+ccl "ccl" aw-lib-dir))
+   #+cmu "cmu" #+clisp "clisp" #+ccl "ccl" #+sbcl "sbcl" aw-lib-dir))
 (system "chmod a+x bin/install.sh")
 
 
@@ -721,9 +729,10 @@ install -m 644 antiweb.~a.image ~a/
 
 (format t "BUILD: Antiweb v~a build OK~%" AW_VERSION)
 
-(let ((image-name (format nil "bin/antiweb.~a.image" #+cmu "cmu" #+clisp "clisp" #+ccl "ccl")))
+(let ((image-name (format nil "bin/antiweb.~a.image" #+cmu "cmu" #+clisp "clisp" #+ccl "ccl" #+sbcl "sbcl")))
   (format t "************* Saving lisp image to ~a *************~%" image-name)
   #+cmu (save-lisp image-name)
   #+clisp (ext:saveinitmem image-name)
   #+ccl (save-application image-name)
+  #+sbcl (sb-ext:save-lisp-and-die image-name)
 )

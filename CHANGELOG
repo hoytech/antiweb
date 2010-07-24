@@ -1,3 +1,8 @@
+4.0BETA18
+
+* Port: SBCL support.
+
+
 4.0BETA17   Jul 17, 2010
 
 * Bugfix: Don't print error message when closing a connection to an

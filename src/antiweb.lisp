@@ -85,6 +85,8 @@
         #+cmu (room nil)
         #+clisp (room)
         #+ccl (room t)
+        #+sbcl (room t)
+        #-(or cmu clisp ccl sbcl) (room)
       )))
     (aw-room-antiweb-memory)))
 

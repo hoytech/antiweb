@@ -338,7 +338,7 @@ conns and ioblocks:
   :content
     (p #"The following steps outline the official Antiweb installation procedure. We recommend that you read the #(link "design.html" "Design of Antiweb4") page before you install Antiweb."#
      (fieldset "Antiweb Installation Procedure"
-     (ol (p #"Install #(link "http://www.cons.org/cmucl/" "CMUCL") or #(link "http://clisp.cons.org/" "CLISP") or #(link "http://www.clozure.com/clozurecl.html" "ClozureCL") (or #(link "faq.html#MULTIPLE-LISPS" "some combination of the above")). Also ensure you have perl, gcc, zlib, and all necessary #(link "faq.html#GCC-ERRORS" "header files") installed."#)
+     (ol (p #"Install #(link "http://www.cons.org/cmucl/" "CMUCL") or #(link "http://clisp.cons.org/" "CLISP") or #(link "http://www.clozure.com/clozurecl.html" "ClozureCL") or #(link "http://www.sbcl.org/" "SBCL") (or #(link "faq.html#MULTIPLE-LISPS" "some combination of the above")). Also ensure you have perl, gcc, zlib, and all necessary #(link "faq.html#GCC-ERRORS" "header files") installed."#)
          (p #"#(link "http://hoytech.com/antiweb/beta/" "Download Antiweb"), extract it, and cd into the Antiweb directory:"#
 (pre #"$ tar zxf antiweb-X.tar.gz
 $ cd antiweb-X"#))
@@ -349,6 +349,8 @@ $ cd antiweb-X"#))
             (pre #"$ clisp -q build.lisp"#)
             #"For ClozureCL, use this command"#
             (pre #"$ ccl64 -Q -l build.lisp"#)
+            #"For SBCL, use this command"#
+            (pre #"$ sbcl --noinform --load build.lisp"#)
             #"When finished, the build script should inform you it has saved your lisp image."#)
          (p #"Antiweb will not rudely scatter files around your filesystem without telling you. cd into the bin directory and review the install.sh script:"#
 (pre #"$ cd bin
@@ -403,6 +405,7 @@ Password:
           #"CMUCL/FreeBSD 7.0/x86"#
           #"ClozureCL/Linux 2.6/x86-64"#
           #"ClozureCL/FreeBSD 8/x86-64"#
+          #"SBCL/Linux 2.6/x86-64"#
         )
         #"#(link "http://www.fefe.de/nowindows/" "Please do not port Antiweb to proprietary unix or lisp environments")."#
       )
@@ -617,7 +620,11 @@ http {
           #"ClozureCL/Linux/x86 seems to have some issues with FFI and is not currently recommended."#
         )
       )
-      (sbcl #"Is SBCL supported?"# #"Currently no. There are likely only some minor porting issues involved. If you port Antiweb to SBCL, we recommend building a single-threaded lisp image."#
+      (sbcl-limitations #"Are there any known limitations with SBCL?"#
+        (ul
+          #"On SBCL, if you build Antiweb as a non-root user, install with sudo, and then try to launch Antiweb when logged in as root, SBCL refuses to start and puts you into the LDB debugger. Until we solve this, when using SBCL make sure if you build Antiweb as a user that you start Antiweb as that user, sudoing for root privileges when necessary."#
+          #"SBCL thread support has severe issues. Antiweb doesn't use threads but be very careful if you incorporate threaded libraries."#
+        )
       )
       (skillz #"Can you teach me l33t k0ding skillz?"# #"Yes, yes we can. Please refer to Doug Hoyte's book #(link "http://letoverlambda.com" "Let Over Lambda") for details on many of the coding techniques used in Antiweb4."#)
     )

@@ -9,7 +9,7 @@
 ;; http://osdir.com/ml/lisp.clisp.general/2003-04/msg00101.html
 
 (defun workaround-cl-pathnames (filename)
-  #+cmu (setq filename (#~s/([\\:*?])/\\\1/ filename))
+  #+(or cmu sbcl) (setq filename (#~s/([\\:*?])/\\\1/ filename))
   filename)
 
 

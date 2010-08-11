@@ -1,5 +1,6 @@
 4.0BETA18
 
+* Port: SBCL support.
 * Security: Fixed Denial Of Service bug where a request to an AWP file
   could cause the worker to exit, interrupting connections being handled
   by that worker process.
@@ -7,7 +8,7 @@
   file code to a non-regular file. There is other code that prevents this,
   but these checks are in case that code changes or is manipulated by
   extensions.
-* Port: SBCL support.
+* Change: Current directory path segments like /./ are no longer allowed.
 
 
 4.0BETA17   Jul 17, 2010

@@ -1226,7 +1226,7 @@
            (setq http-ver "1.0"))
          (let ((http-path (url-decode http-path-encoded)))
            (if (or (null http-path)
-                   (#~m=(?:/[.][^/]|/aw[_/]|[\x00-\x1F])=i http-path) ; Allows all non-control characters. UTF-8 friendly
+                   (#~m=(?:/[.]|/aw[_/]|[\x00-\x1F])=i http-path) ; Allows all non-control characters. UTF-8 friendly
                    (not (valid-utf-8-p http-path)))
              (err-and-linger 400 "URL path contains invalid characters"))
              ,@(mapcar #'http-user-dispatch-macro-request-handler (conf-get-all aw-worker-conf 'handler))

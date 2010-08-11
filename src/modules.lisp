@@ -108,7 +108,7 @@ body,h1 { margin:10px; font-family: Verdana, Arial, sans-serif; }
                  (cache-path (format nil "~a/~a~a" (get-aw-worker-cache-or-error) ,(car (xconf-get handler :hosts)) http-path)))
              (with-awp-error-handler "compile-time"
                (awp-compile awp-file-path (aw_stat_get_mtime stat) cache-path))
-             (setq $u-awp-real-path (format nil "~a~a" cache-path (if (= 1 (length $u-path-info))
+             (setq $u-awp-real-path (format nil "~a~a" cache-path (if (#~m|^/+$| $u-path-info)
                                                                     "/index.html" $u-path-info)))
              (with-awp-error-handler "run-time"
                (when (eq http-method 'post)

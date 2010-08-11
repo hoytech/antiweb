@@ -1,5 +1,8 @@
 4.0BETA18
 
+* Security: Fixed Denial Of Service bug where a request to an AWP file
+  could cause the worker to exit, interrupting connections being handled
+  by that worker process.
 * Port: SBCL support.
 
 

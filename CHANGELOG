@@ -3,6 +3,10 @@
 * Security: Fixed Denial Of Service bug where a request to an AWP file
   could cause the worker to exit, interrupting connections being handled
   by that worker process.
+* Security: Fail-safe checks to ensure we don't apply CGI or regular
+  file code to a non-regular file. There is other code that prevents this,
+  but these checks are in case that code changes or is manipulated by
+  extensions.
 * Port: SBCL support.
 
 

@@ -173,6 +173,8 @@ body,h1 { margin:10px; font-family: Verdana, Arial, sans-serif; }
                (err-and-linger 403 "CGI script isn't world readable"))
              (if (zerop (aw_stat_is_world_executable stat))
                (err-and-linger 403 "CGI script isn't world executable"))
+             (if (zerop (aw_stat_is_reg_file stat))
+               (err-and-linger 403 "CGI script is not a regular file"))
              (let ((single-process-cgis-only ,(if (xconf-get handler :cgi-no-forking) 1 0))
                    (maxfiles ,(or (xconf-get handler :cgi-maxfiles) 50)))
                (let ((cgi-conn
@@ -281,6 +283,8 @@ body,h1 { margin:10px; font-family: Verdana, Arial, sans-serif; }
                     (aw_stat_returning_a_static_struct pstr))))
        (if (cffi:null-pointer-p stat)
          (err-and-linger 404 "File doesn't exist"))
+       (if (zerop (aw_stat_is_reg_file stat))
+         (err-and-linger 403 "Requested resource is not a regular file"))
        (if (eq http-method 'post)
          (err-and-linger 405 "You can't POST to a regular file"))
        (if (zerop (aw_stat_is_world_readable stat))

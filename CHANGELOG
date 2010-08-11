@@ -1,4 +1,4 @@
-4.0BETA18
+4.0BETA18   Aug 10, 2010
 
 * Port: SBCL support.
 * Security: Fixed Denial Of Service bug where a request to an AWP file

@@ -4,7 +4,7 @@
 // It follows a very strict format for parsing by both the C compiler
 // and a special lisp parser that lives in build.lisp.
 
-#define AW_VERSION "4.0BETA17"
+#define AW_VERSION "4.0BETA18"
 
 #define AW_MAX_MSG_LENGTH 100000
 #define AW_IOBLOCK_SIZE 4096 // ideally page size

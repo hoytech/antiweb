@@ -503,7 +503,7 @@ if ($switch eq "-hub") {
   my $arg = shift or usage();
   die "Not a hub directory: $arg" unless (-d $arg);
   die "Path to hubdir/worker conf must be absolute" unless $arg =~ m|^/|;
-  exec_lisp("(run-supervise-hub \"$arg\" \"(aw-hub-reopen-log-files)\" t)");
+  exec_lisp("(run-supervise-hub \"$arg\" \"(reopen-log-files)\" t)");
 } elsif ($switch eq "-add-listener") {
   my $dir = shift or usage();
   my $ip = shift or usage();

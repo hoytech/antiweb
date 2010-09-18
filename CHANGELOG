@@ -1,3 +1,9 @@
+4.0BETA19
+
+* Bugfix: Launch script's -reopen-log-files switch invoked a non-existent
+  function and was therefore broken. Thanks to primus for discovering this.
+
+
 4.0BETA18   Aug 10, 2010
 
 * Port: SBCL support.

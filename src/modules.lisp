@@ -15,12 +15,13 @@
   :directory-handling-phase
     `(let* ((real-path ,(http-root-translate handler 'http-path))
             (stat (cffi:with-foreign-string (pstr real-path)
-                    (aw_stat_returning_a_static_struct pstr))))
+                    (aw_stat_returning_a_static_struct pstr)))
+            (directory-is-world-readable t))
       (unless (cffi:null-pointer-p stat)
 
        (unless (zerop (aw_stat_is_dir stat))
          (if (zerop (aw_stat_is_world_readable stat))
-           (err-and-linger 403 "Directory is not world readable"))
+           (setq directory-is-world-readable nil))
 
          (unless (#~m|/$| http-path)
            (send-http-response-headers 301
@@ -41,6 +42,8 @@
 
            ,(if (xconf-get handler :dir-listings)
               '(progn
+                 (unless directory-is-world-readable
+                   (err-and-linger 403 "Directory is not world readable"))
                  (if (eq http-method 'post)
                    (err-and-linger 405 "Can't POST to a directory"))
                  (setq $u-keepalive nil)

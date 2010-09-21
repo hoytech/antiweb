@@ -2,6 +2,10 @@
 
 * Bugfix: Launch script's -reopen-log-files switch invoked a non-existent
   function and was therefore broken. Thanks to primus for discovering this.
+* Bugfix: Antiweb incorrectly sent a 403 forbidden response when serving an
+  index file from a directory that wasn't world readable. Only a directory
+  listing from such a directory should be forbidden. Thanks to primus for
+  the bug report and the initial patch.
 
 
 4.0BETA18   Aug 10, 2010

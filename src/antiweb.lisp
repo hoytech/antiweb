@@ -472,13 +472,14 @@
 
 
 
-
+(defvar main-char-type #+sb-unicode 'character
+                       #-sb-unicode 'base-char)
 
 ;; Don't use these buffers to store anything between closure invocations. They *will* be overwritten.
 (defvar shared-input-buffer
-  (make-array AW_MAX_MSG_LENGTH :element-type 'base-char :fill-pointer t))
+  (make-array AW_MAX_MSG_LENGTH :element-type main-char-type :fill-pointer t))
 (defvar shared-output-buffer
-  (make-array AW_MAX_MSG_LENGTH :element-type 'base-char :fill-pointer t))
+  (make-array AW_MAX_MSG_LENGTH :element-type main-char-type :fill-pointer t))
 
 
 ;; Any data from str must be UTF-8 decoded before performing character processing
